@@ -1,0 +1,39 @@
+import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
+
+export default defineConfig({
+  base: './',
+  build: { outDir: 'dist', sourcemap: true },
+  plugins: [
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'tracks.json'],
+      manifest: {
+        name: 'КГ Спорт',
+        short_name: 'SkiTrails',
+        description: 'Интерактивный просмотр лыжных трасс',
+        theme_color: '#1a1a2e',
+        background_color: '#1a1a2e',
+        display: 'standalone',
+        orientation: 'any',
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      },
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,svg,png,json,kml,gpx}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: { cacheName: 'mapbox-tiles', expiration: { maxEntries: 2000, maxAgeSeconds: 60 * 60 * 24 * 30 } }
+          }
+        ]
+      }
+    })
+  ],
+  optimizeDeps: { exclude: ['maplibre-gl'] },
+  worker: { format: 'es' },
+});
