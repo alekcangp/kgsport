@@ -35,7 +35,7 @@ npm run test
 
 - `src/` — исходный код приложения
 - `scripts/build-tracks.mjs` — генерация `public/tracks.json` из файлов в `public/tracks`
-- `public/tracks/` — исходные GPX/KML трассы
+- `public/tracks/` — исходные GPX трассы
 
 ## Лицензия
 
