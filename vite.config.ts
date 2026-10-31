@@ -16,10 +16,7 @@ export default defineConfig({
         background_color: '#1a1a2e',
         display: 'standalone',
         orientation: 'any',
-        icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' }
-        ]
+        icons: []
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
@@ -35,5 +32,4 @@ export default defineConfig({
     })
   ],
   optimizeDeps: { exclude: ['maplibre-gl'] },
-  worker: { format: 'es' },
 });
