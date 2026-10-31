@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'tracks.json'],
       manifest: {
         name: 'КГ Спорт',
-        short_name: 'SkiTrails',
+        short_name: 'КГ Спорт',
         description: 'Интерактивный просмотр лыжных трасс',
         theme_color: '#1a1a2e',
         background_color: '#1a1a2e',
