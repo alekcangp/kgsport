@@ -1,7 +1,7 @@
 import './styles.css';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-maplibregl.setWorkerUrl('https://cdn.jsdelivr.net/npm/maplibre-gl@6.16.0/dist/maplibre-gl-worker.mjs');
+maplibregl.setWorkerUrl('/maplibre-gl-worker.mjs');
 import type { Track } from './types';
 import { length, lineString } from '@turf/turf';
 const app = document.getElementById('app')!;
