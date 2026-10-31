@@ -175,7 +175,10 @@ async function fetchElevations(coords: number[][]): Promise<number[]> {
           continue;
         }
         const data = await res.json();
-        for (const r of data.results || []) out.push(r.elevation ?? 0);
+        const results = data.results || [];
+        for (let j = 0; j < batch.length; j++) {
+          out.push(results[j]?.elevation ?? 0);
+        }
         break;
       } catch {
         await new Promise<void>((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
