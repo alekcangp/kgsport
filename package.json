@@ -1,7 +1,7 @@
 {
   "name": "kg",
   "version": "1.0.0",
-  "description": "Интерактивный просмотр лыжных трасс",
+  "description": "Интерактивная карта лыжной трассы",
   "type": "module",
   "scripts": {
     "dev": "npm run build:tracks && vite",

@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'tracks.json'],
       manifest: {
-        name: 'КГ Спорт',
-        short_name: 'КГ Спорт',
+        name: 'СШ "Крутая горка"',
+        short_name: 'СШ "Крутая горка"',
         description: 'Интерактивный просмотр лыжных трасс',
         theme_color: '#1a1a2e',
         background_color: '#1a1a2e',
