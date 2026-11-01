@@ -33,7 +33,7 @@ function renderGallery(tracks: Track[]) {
   for (const t of gpxTracks) {
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `<canvas class="canvas-thumb" data-id="${t.id}"></canvas><div class="p-3"><div class="font-semibold">${t.name}</div><div class="text-sm text-slate-400">${t.distanceKm} км</div></div>`;
+    card.innerHTML = `<canvas class="canvas-thumb" data-id="${t.id}"></canvas><div class="p-3"><div class="font-semibold">${t.name}</div><div class="text-sm text-slate-400">${t.distanceKm} км · ↑ ${t.ascentM} м</div></div>`;
 card.addEventListener('click', () => { showViewer(t); });
     grid.appendChild(card);
   }

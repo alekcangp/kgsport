@@ -28,11 +28,20 @@ function extractLine(gj) {
   for (const f of gj.features) {
     if (f.geometry && (f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString')) {
       let coords = f.geometry.type === 'LineString' ? f.geometry.coordinates : f.geometry.coordinates.flat();
-      coords = coords.map((c) => [c[0], c[1]]);
+      coords = coords.map((c) => [c[0], c[1], c[2] ?? 0]);
       return { coords, name: f.properties?.name || null };
     }
   }
   return null;
+}
+
+function ascentM(coords) {
+  let gain = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const d = (coords[i][2] ?? 0) - (coords[i - 1][2] ?? 0);
+    if (d > 0) gain += d;
+  }
+  return Math.round(gain);
 }
 
 function haversineKm(coords) {
@@ -57,6 +66,7 @@ async function main() {
     if (!line) continue;
     const coords = line.coords;
     const distanceKm = haversineKm(coords);
+    const ascent = ascentM(coords);
     const bbox = turf.bbox(turf.lineString(coords));
     const name = line.name || basename(file, ext);
     tracks.push({
@@ -64,6 +74,7 @@ async function main() {
       name,
       file,
       distanceKm: Math.round(distanceKm * 100) / 100,
+      ascentM: ascent,
       bbox,
       points: coords.length
     });
