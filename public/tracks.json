@@ -1,8 +1,8 @@
 [
   {
-    "id": "1А",
+    "id": "1A",
     "name": "Дистанция 1А",
-    "file": "1А.gpx",
+    "file": "1A.gpx",
     "distanceKm": 1.03,
     "ascentM": 35,
     "bbox": [
@@ -14,9 +14,9 @@
     "points": 138
   },
   {
-    "id": "1Б",
+    "id": "1B",
     "name": "Дистанция 1Б",
-    "file": "1Б.gpx",
+    "file": "1B.gpx",
     "distanceKm": 0.92,
     "ascentM": 9,
     "bbox": [
@@ -42,9 +42,9 @@
     "points": 437
   },
   {
-    "id": "5А",
+    "id": "5A",
     "name": "Дистанция 5А",
-    "file": "5А.gpx",
+    "file": "5A.gpx",
     "distanceKm": 5.04,
     "ascentM": 156,
     "bbox": [
@@ -56,9 +56,9 @@
     "points": 721
   },
   {
-    "id": "5Б",
+    "id": "5B",
     "name": "Дистанция 5Б",
-    "file": "5Б.gpx",
+    "file": "5B.gpx",
     "distanceKm": 4.95,
     "ascentM": 139,
     "bbox": [

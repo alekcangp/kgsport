@@ -2,6 +2,7 @@ import './styles.css';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 maplibregl.setWorkerUrl('./maplibre-gl-worker.mjs');
+import QRCode from 'qrcode';
 import type { Track } from './types';
 import { length, lineString } from '@turf/turf';
 const app = document.getElementById('app')!;
@@ -15,9 +16,12 @@ let dists: number[] = [];
 
 let isFlying = false;
 let flyProgress = 0;
-const CRUISE_STEP = 0.3;
+const CRUISE_STEP = 0.2;
 let flyStepSize = CRUISE_STEP;
 let flyRafId: number | null = null;
+
+const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
+const SAMPLE_STEP_M = 5;
 
 
 async function loadTracks(): Promise<Track[]> {
@@ -103,7 +107,7 @@ async function initViewer(t: Track) {
     },
     center: [coords[0][0], coords[0][1]],
     zoom: 15,
-    minZoom: 10,
+    minZoom: 13,
     maxZoom: 16,
     pitch: 45,
     bearing: 0,
@@ -128,13 +132,22 @@ async function initViewer(t: Track) {
       document.getElementById('cruise')!.textContent = 'Круиз';
     }
   });
-  document.getElementById('download')!.addEventListener('click', () => downloadTrack(t.file));
+  document.getElementById('download')!.addEventListener('click', () => openDownloadPopup(t));
   map.on('load', () => {
-      map.addSource('track', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } as any });
-      map.addLayer({ id: 'track-line', type: 'line', source: 'track', paint: { 'line-color': '#3b82f6', 'line-width': 4 } });
-      new maplibregl.Marker({ color: '#22c55e' }).setLngLat(coords[0] as [number, number]).addTo(map);
-      new maplibregl.Marker({ color: '#ef4444' }).setLngLat(coords[coords.length-1] as [number, number]).addTo(map);
+
+      const startEl = document.createElement('div');
+      startEl.className = 'track-marker start';
+      startEl.textContent = 'С';
+      new maplibregl.Marker({ element: startEl, anchor: 'bottom' }).setLngLat(coords[0] as [number, number]).addTo(map);
+      const finishEl = document.createElement('div');
+      finishEl.className = 'track-marker finish';
+      finishEl.textContent = 'Ф';
+      new maplibregl.Marker({ element: finishEl, anchor: 'bottom' }).setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
       flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[0] as [number, number]).addTo(map);
+      {
+        const el = flyMarker.getElement();
+        if (el) el.style.display = 'none';
+      }
       drawProfile(coords);
       setTimeout(() => drawProfile(coords), 2000);
       const profileCanvas = document.getElementById('profile') as HTMLCanvasElement;
@@ -151,7 +164,12 @@ async function initViewer(t: Track) {
         });
         currentIdx = best;
         flyProgress = best;
-        if (flyMarker) flyMarker.setLngLat(coords[best] as [number, number]);
+        if (flyMarker) {
+          const el = flyMarker.getElement();
+          if (best === 0 || best === coords.length - 1) { el.style.display = 'none'; }
+          else { el.style.display = ''; }
+          flyMarker.setLngLat(coords[best] as [number, number]);
+        }
         else flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo((window as any).__map);
         redrawProfile();
       });
@@ -187,6 +205,102 @@ async function fetchElevations(coords: number[][]): Promise<number[]> {
   return out;
 }
 
+function renderTrackSlope(coords: number[][], elevations: number[]) {
+  const map = (window as any).__map;
+  if (!map) return;
+
+  // Удаляем старый одноцветный слой, если остался
+  if (map.getLayer('track-line')) map.removeLayer('track-line');
+  if (map.getSource('track')) map.removeSource('track');
+
+  type SlopeType = 'ascent' | 'descent' | 'flat';
+
+  // Накопительные дистанции между точками GPX (в метрах)
+  const distsM: number[] = [0];
+  for (let i = 1; i < coords.length; i++) {
+    distsM.push(distsM[distsM.length - 1] + length(lineString([coords[i - 1], coords[i]]), { units: 'kilometers' }) * 1000);
+  }
+  const totalM = distsM[distsM.length - 1];
+  if (totalM <= 0) return;
+
+  // Сэмплируем трассу каждые SAMPLE_STEP_M метров с линейной интерполяцией высоты
+  const sampleCoords: number[][] = [];
+  const sampleElevs: number[] = [];
+  let segIdx = 0;
+  for (let d = 0; d <= totalM; d += SAMPLE_STEP_M) {
+    while (segIdx < distsM.length - 1 && distsM[segIdx + 1] < d) segIdx++;
+    const t = (d - distsM[segIdx]) / (distsM[segIdx + 1] - distsM[segIdx] || 1);
+    const c0 = coords[segIdx], c1 = coords[segIdx + 1] || coords[segIdx];
+    sampleCoords.push([c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t]);
+    const nextElev = elevations[segIdx + 1] ?? elevations[segIdx];
+    sampleElevs.push(elevations[segIdx] + (nextElev - elevations[segIdx]) * t);
+  }
+
+  // Сглаживаем высоты скользящим средним (окно 5 сэмплов), чтобы шум GPS не дрробил цвета
+  const smoothElevs = [...sampleElevs];
+  const win = 5;
+  for (let i = 0; i < sampleElevs.length; i++) {
+    let sum = 0, cnt = 0;
+    for (let j = Math.max(0, i - win); j <= Math.min(sampleElevs.length - 1, i + win); j++) {
+      sum += sampleElevs[j]; cnt++;
+    }
+    smoothElevs[i] = sum / cnt;
+  }
+
+  // Классифицируем интервалы между сэмплами (~10 м) по углу наклона и склеиваем соседние одинаковые типы
+  const segments: { type: SlopeType; coords: number[][] }[] = [];
+  const angleRad = (SLOPE_ANGLE_DEG * Math.PI) / 180;
+  for (let i = 0; i < sampleCoords.length - 1; i++) {
+    const diff = smoothElevs[i + 1] - smoothElevs[i];
+    const distM = length(lineString([sampleCoords[i], sampleCoords[i + 1]]), { units: 'kilometers' }) * 1000;
+    const angle = Math.atan2(diff, distM || 1);
+    let type: SlopeType;
+    if (angle > angleRad) type = 'ascent';
+    else if (angle < -angleRad) type = 'descent';
+    else type = 'flat';
+
+    const last = segments[segments.length - 1];
+    if (last && last.type === type) {
+      last.coords.push(sampleCoords[i + 1]);
+    } else {
+      segments.push({ type, coords: [sampleCoords[i], sampleCoords[i + 1]] });
+    }
+  }
+
+  const typeColors: Record<SlopeType, string> = {
+    ascent: '#ef4444',   // подъём — красный
+    descent: '#22c55e',  // спуск — зелёный
+    flat: '#94a3b8',     // ровный — серый (только длинные ровные участки)
+  };
+
+  for (const [type, color] of Object.entries(typeColors)) {
+    const feats = segments
+      .filter(s => s.type === type)
+      .map(s => ({ type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: s.coords } }));
+
+    if (feats.length === 0) continue;
+
+    const sourceId = `track-${type}`;
+    const layerId = `track-${type}-line`;
+    const geojson = { type: 'FeatureCollection', features: feats } as any;
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, { type: 'geojson', data: geojson });
+    } else {
+      (map.getSource(sourceId) as any).setData(geojson);
+    }
+
+    if (!map.getLayer(layerId)) {
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        paint: { 'line-color': color, 'line-width': 4 },
+      });
+    }
+  }
+}
+
 
 async function drawProfile(coords: number[][]) {
   const canvas = document.getElementById('profile') as HTMLCanvasElement;
@@ -202,6 +316,10 @@ async function drawProfile(coords: number[][]) {
   }
   if (!elevations.length) return;
   dists = coords.map((_, i) => (i === 0 ? 0 : length(lineString(coords.slice(0, i + 1)), { units: 'kilometers' })));
+  // Если высоты неизвестны (все 0) — не закрашиваем трек серым
+  if (!elevations.every(e => e === 0)) {
+    renderTrackSlope(coords, elevations);
+  }
   const miny = Math.min(...elevations), maxy = Math.max(...elevations);
   const range = maxy - miny || 1;
   ctx.fillStyle = '#0f172a';
@@ -293,13 +411,18 @@ ctx.fillText((elevations[hi] ?? 0).toFixed(1) + ' м · ' + (dists[hi] ?? 0).toF
 function flyStep(map: maplibregl.Map, coords: number[][]) {
   if (!isFlying) return;
   flyProgress += flyStepSize;
-  if (flyProgress >= coords.length - 1) { flyProgress = coords.length - 1; isFlying = false; if (flyMarker) { flyMarker.remove(); flyMarker = null; } const btn = document.getElementById('cruise'); if (btn) btn.textContent = 'Круиз'; }
+  if (flyProgress >= coords.length - 1) { flyProgress = 0; }
   const i = Math.floor(flyProgress);
   const frac = flyProgress - i;
   const a = coords[i], b = coords[Math.min(i + 1, coords.length - 1)];
   const lng = a[0] + (b[0] - a[0]) * frac;
   const lat = a[1] + (b[1] - a[1]) * frac;
-  if (flyMarker) flyMarker.setLngLat([lng, lat]);
+  if (flyMarker) {
+    const el = flyMarker.getElement();
+    if (i === 0 || i === coords.length - 1) { el.style.display = 'none'; }
+    else { el.style.display = ''; }
+    flyMarker.setLngLat([lng, lat]);
+  }
   try { map.panTo([lng, lat], { animate: false, duration: 0 }); } catch {}
   currentIdx = i;
   redrawProfile();
@@ -311,6 +434,56 @@ function downloadTrack(file: string) {
   a.href = `./tracks/${file}`;
   a.download = file;
   a.click();
+}
+
+function openDownloadPopup(t: Track) {
+  const downloadUrl = new URL(`./tracks/${encodeURIComponent(t.file)}`, location.href).href;
+  const existing = document.getElementById('download-popup');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'download-popup-overlay';
+  overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4';
+  overlay.innerHTML = `
+    <div id="download-popup" class="bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-xs w-full text-center border border-slate-600">
+      <button id="download-popup-close" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+        ✕
+      </button>
+      <h3 class="text-lg font-bold mb-2 text-white">Загрузить трек</h3>
+      <p class="text-sm text-slate-300 mb-4">${t.name}</p>
+      <div class="flex items-center justify-center mb-6">
+        <canvas id="download-qr" width="200" height="200" class="rounded-lg bg-white p-1 shadow"></canvas>
+      </div>
+      <button id="download-popup-btn" class="w-full px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition shadow-lg">
+        Загрузить на устройство
+      </button>
+      <p class="text-xs text-slate-500 mt-3">Или отсканируйте QR‑код камерой телефона</p>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Генерируем QR‑код с абсолютной ссылкой на трек
+  QRCode.toCanvas(document.getElementById('download-qr') as HTMLCanvasElement, downloadUrl, {
+    width: 200,
+    margin: 2,
+    color: { dark: '#000000', light: '#ffffff' },
+  }, (err) => {
+    if (err) console.error('QR code error:', err);
+  });
+
+  const closePopup = () => overlay.remove();
+
+  document.getElementById('download-popup-close')!.addEventListener('click', closePopup);
+  document.getElementById('download-popup-btn')!.addEventListener('click', () => {
+    downloadTrack(t.file);
+    closePopup();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePopup();
+  });
+  const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') { closePopup(); document.removeEventListener('keydown', onEsc); } };
+  document.addEventListener('keydown', onEsc);
 }
 
 
@@ -326,6 +499,8 @@ async function parseCoords(file: string, text: string): Promise<number[][]> {
 }
 
 async function init() {
+  const popup = document.getElementById('download-popup-overlay');
+  if (popup) popup.remove();
   if (flyMarker) { flyMarker.remove(); flyMarker = null; }
   currentIdx = 0; flyProgress = 0; isFlying = false;
   const tracks = await loadTracks();
