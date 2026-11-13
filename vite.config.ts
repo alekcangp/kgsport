@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ['maplibre-gl-worker.mjs', 'og-image.png', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: 'Крутая горка',
-        short_name: 'Горка',
+        short_name: 'Крутая горка',
         description: 'Интерактивный просмотр лыжных трасс',
         lang: 'ru',
         theme_color: '#0a1713',
