@@ -6,6 +6,7 @@ html, body, #app { height: 100%; margin: 0; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
 #app { min-height: 100vh; }
+.ui-icon { display: block; width: 1em; height: 1em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; pointer-events: none; }
 .card { @apply bg-slate-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition; }
 .btn { @apply px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium; }
 .btn-ghost { @apply px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm; }
@@ -59,7 +60,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   cursor: pointer;
   transition: background .2s, border-color .2s, transform .2s;
 }
-.map-back span, .map-action > span { color: #729831; font-size: 16px; }
+.map-back > .ui-icon, .map-action > .ui-icon { color: #729831; font-size: 16px; }
 .map-back:hover, .map-action:hover { transform: translateY(-1px); border-color: #a8be80; background: #fff; }
 .map-track-heading { min-width: 0; }
 .map-track-heading h1 { overflow: hidden; margin: 0; color: #1d3525; font-size: clamp(16px, 2vw, 21px); font-weight: 900; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
@@ -116,6 +117,27 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   .profile-heading > span { font-size: 7px; }
   .map-view .profile-canvas { height: 52px; }
 }
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
+  .map-view { height: 100vh; height: 100dvh; min-height: 0; }
+  .map-toolbar { flex: 0 0 auto; gap: 4px 8px; padding: max(4px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) 4px max(8px, env(safe-area-inset-left, 0px)); }
+  .map-back, .map-action { min-height: 38px; }
+  .map-track-heading h1 { font-size: 14px; }
+  .map-track-distance strong { font-size: 18px; }
+  .track-map { min-height: 0; flex: 1 1 0; }
+  .map-view #map { min-height: 0; }
+  .profile-panel { flex: 0 0 auto; padding: 3px 12px max(2px, env(safe-area-inset-bottom, 0px)); }
+  .profile-heading { margin-bottom: 2px; }
+  .profile-heading > span { display: none; }
+  .map-view .profile-canvas { height: clamp(32px, 11dvh, 48px); touch-action: pan-y; }
+  .map-view .maplibregl-ctrl-top-left { top: 4px; left: 4px; }
+  .map-view .maplibregl-ctrl-top-right { top: 4px; right: 4px; }
+  .map-view .maplibregl-ctrl-bottom-left { bottom: 3px; left: 3px; }
+  .map-view .maplibregl-ctrl-bottom-right { right: 3px; bottom: 3px; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 760px) {
+  .map-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+  .map-back, .map-action { min-height: 36px; }
+}
 @media (pointer: coarse) {
   .map-view .maplibregl-ctrl-group button { width: 44px; height: 44px; }
   .track-card { touch-action: manipulation; }
@@ -157,7 +179,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .brand-name { font-size: 12px; font-weight: 900; line-height: .96; letter-spacing: .12em; }
 .header-link { display: inline-flex; align-items: center; gap: 9px; color: rgba(255, 255, 255, .7); font-size: 9px; font-weight: 800; letter-spacing: .15em; text-decoration: none; }
-.header-link .season-icon { color: var(--lime); font-size: 17px; }
+.header-link .season-icon { display: inline-flex; color: var(--lime); font-size: 17px; }
 .hero-section {
   position: relative;
   z-index: 1;
@@ -210,7 +232,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   transition: background .2s ease, transform .2s ease;
 }
 .primary-cta:hover { transform: translateY(-2px); background: #d5ff7a; box-shadow: 0 8px 26px rgba(199, 246, 87, .2); }
-.primary-cta span { font-size: 18px; }
+.primary-cta > .ui-icon { font-size: 18px; }
 .hero-note { display: flex; align-items: center; gap: 10px; margin-top: 25px; color: rgba(241, 245, 235, .48); font-size: 10px; letter-spacing: .04em; }
 .hero-note-line { width: 25px; height: 1px; background: var(--lime); }
 .hero-facts { display: flex; align-items: stretch; gap: clamp(18px, 3vw, 34px); margin-top: 32px; }
@@ -288,7 +310,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .qr-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
 .qr-overline { color: #536154; font-size: 8px; letter-spacing: .09em; }
 .qr-copy strong { font-size: 16px; font-weight: 900; letter-spacing: -.04em; line-height: 1.02; }
-.qr-corner { position: absolute; top: 8px; right: 9px; color: #789644; font-size: 12px; }
+.qr-corner { position: absolute; top: 8px; right: 9px; display: inline-flex; color: #789644; font-size: 12px; }
 .hero-stat { position: absolute; bottom: 27px; display: flex; align-items: center; gap: 12px; }
 .hero-stat-one { left: clamp(22px, 10vw, 152px); }
 .hero-stat-two { right: clamp(22px, 10vw, 152px); }
@@ -298,7 +320,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .routes-screen { min-height: 100vh; background: var(--paper); color: var(--forest-deep); }
 .routes-header { display: flex; height: 68px; align-items: center; justify-content: space-between; padding: 0 clamp(22px, 7vw, 112px); border-bottom: 1px solid #dedfd5; }
 .back-home { display: inline-flex; align-items: center; gap: 9px; padding: 9px 0; border: 0; background: transparent; color: #455449; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
-.back-home span { color: #739d32; font-size: 17px; }
+.back-home > .ui-icon { color: #739d32; font-size: 17px; }
 .routes-brand { color: #526052; font-size: 9px; font-weight: 900; letter-spacing: .14em; }
 .routes-brand i { color: #759536; font-style: normal; }
 .routes-section { padding: 72px clamp(22px, 10vw, 152px) 27px; background: var(--paper); color: var(--forest-deep); scroll-margin-top: 0; }
@@ -323,6 +345,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .track-number { top: 13px; left: 14px; color: rgba(255, 255, 255, .72); font-size: 8px; font-weight: 800; letter-spacing: .15em; }
 .track-number b { margin-left: 5px; color: var(--lime); font-size: 11px; }
 .track-open { top: 11px; right: 12px; display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid rgba(255, 255, 255, .48); border-radius: 50%; color: white; font-size: 14px; transition: color .2s, background .2s; }
+.track-open .ui-icon { font-size: 14px; }
 .track-card:hover .track-open { background: var(--lime); color: var(--forest-deep); }
 .track-card-content { padding: 17px 18px 15px; }
 .track-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -333,10 +356,10 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .track-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 13px; padding-top: 12px; border-top: 1px solid #e9ebe3; }
 .distance-label { color: #819080; font-size: 7px; font-weight: 800; letter-spacing: .1em; }
 .track-ascent { flex: 0 0 auto; color: #394b3a; font-size: 10px; font-weight: 900; }
-.track-ascent > span { color: #83a737; }
+.track-ascent > .ui-icon { display: inline-block; color: #83a737; font-size: 12px; }
 .track-ascent i { color: #8a9487; font-size: 9px; font-style: normal; font-weight: 500; }
 .routes-footer { display: flex; justify-content: space-between; max-width: 1136px; margin: 47px auto 0; padding: 17px 0 3px; border-top: 1px solid #dedfd5; color: #778075; font-size: 8px; font-weight: 800; letter-spacing: .14em; }
-.routes-footer i { color: #759536; font-size: 13px; font-style: normal; }
+.routes-footer .ui-icon { display: inline-block; color: #759536; font-size: 13px; }
 
 @media (min-width: 1450px) {
   .hero-stat-one { left: calc((100% - 1136px) / 2); }
@@ -494,7 +517,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   cursor: pointer;
   transition: background .2s, border-color .2s, color .2s;
 }
-.download-popup-close span { font-size: 23px; line-height: 1; }
+.download-popup-close > .ui-icon { font-size: 23px; }
 .download-popup-close:hover { border-color: #a8be80; background: #fff; color: #10251f; }
 .download-popup-eyebrow {
   display: block;
@@ -548,7 +571,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   cursor: pointer;
   transition: transform .2s, border-color .2s, background .2s;
 }
-.download-popup-button > span { color: #c7f657; font-size: 18px; }
+.download-popup-button > .ui-icon { color: #c7f657; font-size: 18px; }
 .download-popup-button:hover { transform: translateY(-1px); border-color: #203d2d; background: #203d2d; }
 .download-popup-hint {
   margin: 13px 0 0;

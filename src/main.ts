@@ -28,6 +28,19 @@ let flyRafId: number | null = null;
 const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
 const SAMPLE_STEP_M = 5;
 
+const UI_ICONS = {
+  snowflake: '<path d="M12 2v20M3.34 7l17.32 10M3.34 17 20.66 7M8 4l4 3 4-3M8 20l4-3 4 3M3 10l4-1 1-4M20 10l-4-1-1-4M3 14l4 1 1 4M20 14l-4 1-1 4"/>',
+  northeast: '<path d="M7 17 17 7M8 7h9v9"/>',
+  left: '<path d="M19 12H5m7 7-7-7 7-7"/>',
+  down: '<path d="M12 4v16m-7-7 7 7 7-7"/>',
+  play: '<path d="m8 5 12 7-12 7z" fill="currentColor" stroke="none"/>',
+  close: '<path d="m18 6-12 12M6 6l12 12"/>',
+} as const;
+
+function uiIcon(name: keyof typeof UI_ICONS): string {
+  return `<svg class="ui-icon ui-icon-${name}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${UI_ICONS[name]}</svg>`;
+}
+
 
 async function loadTracks(): Promise<Track[]> {
   const res = await fetch('./tracks.json');
@@ -69,14 +82,14 @@ function renderGallery(tracks: Track[]) {
         <section id="home-screen" class="home-screen" aria-labelledby="hero-title">
           <header class="site-header">
             <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span></span>
-            <span class="header-link"><span class="season-icon" aria-hidden="true">✳</span> ЗИМНИЙ СЕЗОН</span>
+            <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
           </header>
         <div class="hero-section" aria-labelledby="hero-title">
           <div class="hero-copy">
             <div class="hero-eyebrow"><span class="eyebrow-rule"></span> ЛЫЖНЫЕ МАРШРУТЫ РЯДОМ</div>
             <h1 id="hero-title">ТВОЙ ТЕМП.<br>ТВОЯ <span>ТРАССА.</span></h1>
             <p class="hero-description">Свежий воздух, снег и маршрут под настроение. Изучай трассы «Крутой горки» и выбирай свою.</p>
-            <button id="show-routes" class="primary-cta" type="button">Выбрать трассу <span aria-hidden="true">↗</span></button>
+            <button id="show-routes" class="primary-cta" type="button">Выбрать трассу ${uiIcon('northeast')}</button>
             <div class="hero-note"><span class="hero-note-line"></span> Твой следующий день на снегу начинается здесь</div>
           </div>
 
@@ -99,7 +112,7 @@ function renderGallery(tracks: Track[]) {
             <div class="hero-qr-card">
               <div class="qr-frame"><canvas id="site-qr" width="144" height="144" aria-label="QR-код сайта Крутая горка"></canvas></div>
               <div class="qr-copy"><strong>Все трассы<br>на телефоне</strong><span class="qr-overline">Ссылка на сайт</span></div>
-              <span class="qr-corner" aria-hidden="true">✳</span>
+              <span class="qr-corner">${uiIcon('snowflake')}</span>
             </div>
           </div>
 
@@ -108,7 +121,7 @@ function renderGallery(tracks: Track[]) {
 
         <section id="routes-screen" class="routes-screen" aria-labelledby="routes-title" hidden>
           <header class="routes-header">
-            <button id="show-home" class="back-home" type="button"><span aria-hidden="true">←</span> На главную</button>
+            <button id="show-home" class="back-home" type="button">${uiIcon('left')} На главную</button>
             <span class="routes-brand">КРУТАЯ ГОРКА <i>·</i> ОМСК</span>
           </header>
           <div class="routes-section">
@@ -121,7 +134,7 @@ function renderGallery(tracks: Track[]) {
               </div>
             </div>
             <div id="grid" class="track-grid"></div>
-            <div class="routes-footer"><span>КРУТАЯ ГОРКА · ОМСК</span><span>ВСТРЕТИМСЯ НА ТРАССЕ <i>↗</i></span></div>
+            <div class="routes-footer"><span>КРУТАЯ ГОРКА · ОМСК</span><span>ВСТРЕТИМСЯ НА ТРАССЕ ${uiIcon('northeast')}</span></div>
           </div>
         </section>
       </main>
@@ -141,12 +154,12 @@ function renderGallery(tracks: Track[]) {
       <div class="track-art">
         <canvas class="canvas-thumb" data-id="${t.id}" aria-hidden="true"></canvas>
         <span class="track-number">ТРЕК <b>${t.id}</b></span>
-        <span class="track-open" aria-hidden="true">↗</span>
+        <span class="track-open">${uiIcon('northeast')}</span>
       </div>
       <div class="track-card-content">
         <div class="track-title-row"><h3>${t.name}</h3></div>
         <div class="track-distance"><strong>${t.distanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}</strong><span>км</span></div>
-        <div class="track-card-bottom"><span class="distance-label">ПРОТЯЖЁННОСТЬ МАРШРУТА</span><span class="track-ascent"><span aria-hidden="true">↗</span> ${t.ascentM} м <i>набор высоты</i></span></div>
+        <div class="track-card-bottom"><span class="distance-label">ПРОТЯЖЁННОСТЬ МАРШРУТА</span><span class="track-ascent">${uiIcon('northeast')} ${t.ascentM} м <i>набор высоты</i></span></div>
       </div>`;
     const openTrack = () => showViewer(t);
     card.addEventListener('click', openTrack);
@@ -210,10 +223,10 @@ function showViewer(t: Track) {
   app.innerHTML = `
     <div class="map-view">
       <header class="map-toolbar">
-        <button id="back" class="map-back" type="button"><span aria-hidden="true">←</span> К трассам</button>
+        <button id="back" class="map-back" type="button">${uiIcon('left')} К трассам</button>
         <div class="map-track-heading"><h1>${t.name}</h1></div>
         <div class="map-track-distance"><strong>${t.distanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}</strong><span>КМ</span></div>
-        <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button"><span aria-hidden="true">▶</span> Круиз</button><button id="download" class="map-action" type="button"><span aria-hidden="true">↓</span> GPX</button></div>
+        <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} GPX</button></div>
       </header>
       <div id="map" class="track-map"></div>
       <section class="profile-panel" aria-label="Профиль высот маршрута">
@@ -658,7 +671,7 @@ function openDownloadPopup(t: Track) {
   overlay.innerHTML = `
     <section id="download-popup" class="download-popup" role="dialog" aria-modal="true" aria-labelledby="download-popup-title">
       <button id="download-popup-close" class="download-popup-close" type="button" aria-label="Закрыть окно">
-        <span aria-hidden="true">×</span>
+        ${uiIcon('close')}
       </button>
       <span class="download-popup-eyebrow">ФАЙЛ МАРШРУТА</span>
       <h2 id="download-popup-title" class="download-popup-title">Загрузить трек</h2>
@@ -667,7 +680,7 @@ function openDownloadPopup(t: Track) {
         <canvas id="download-qr" width="200" height="200" class="download-popup-qr" aria-label="QR-код для загрузки GPX-маршрута"></canvas>
       </div>
       <button id="download-popup-btn" class="download-popup-button" type="button">
-        <span aria-hidden="true">↓</span>
+        ${uiIcon('down')}
         Загрузить на устройство
       </button>
       <p class="download-popup-hint">Или отсканируйте QR‑код камерой телефона</p>
