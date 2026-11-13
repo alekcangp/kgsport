@@ -112,7 +112,6 @@ function renderGallery(tracks: Track[]) {
             <div class="hero-qr-card">
               <div class="qr-frame"><canvas id="site-qr" width="144" height="144" aria-label="QR-код сайта Крутая горка"></canvas></div>
               <div class="qr-copy"><strong>Все трассы<br>на телефоне</strong><span class="qr-overline">Ссылка на сайт</span></div>
-              <span class="qr-corner">${uiIcon('snowflake')}</span>
             </div>
           </div>
 
