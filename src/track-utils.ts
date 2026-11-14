@@ -135,3 +135,33 @@ export function valueAtDistance(
 
   return values[index] + (values[next] - values[index]) * fraction;
 }
+
+/**
+ * Угол наклона маршрута в градусах по высотам на расстоянии distanceKm.
+ * Считается по окну ±halfWindowKm, чтобы шум GPS не дёргал показатель.
+ * Положительный угол — подъём, отрицательный — спуск.
+ */
+export function slopeAngleAtDistance(
+  dists: number[],
+  values: number[],
+  distanceKm: number,
+  halfWindowKm = 0.005,
+): number | null {
+  if (dists.length !== values.length || values.length < 2) return null;
+
+  const total = dists[dists.length - 1];
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  const km = Math.min(Math.max(distanceKm, 0), total);
+  const window = Math.max(0, halfWindowKm);
+  const from = Math.max(0, km - window);
+  const to = Math.min(total, km + window);
+  const runM = (to - from) * 1000;
+  if (runM <= 0) return null;
+
+  const before = valueAtDistance(dists, values, from);
+  const after = valueAtDistance(dists, values, to);
+  if (before === null || after === null) return null;
+
+  return (Math.atan2(after - before, runM) * 180) / Math.PI;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, valueAtDistance } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, slopeAngleAtDistance, valueAtDistance } from './track-utils';
 
 describe('escapeHtml', () => {
   it('экранирует HTML-спецсимволы', () => {
@@ -121,5 +121,40 @@ describe('valueAtDistance', () => {
 
   it('для маршрута нулевой длины возвращает первое значение', () => {
     expect(valueAtDistance([0, 0], [50, 60], 0)).toBe(50);
+  });
+});
+
+describe('slopeAngleAtDistance', () => {
+  const grade10 = [0, 0.1];
+  const heights = [0, 10];
+
+  it('возвращает null для некорректных данных', () => {
+    expect(slopeAngleAtDistance([], [], 0)).toBeNull();
+    expect(slopeAngleAtDistance([0, 0], [10, 20], 0)).toBeNull();
+    expect(slopeAngleAtDistance([0, 1], [10], 0.5)).toBeNull();
+  });
+
+  it('считает угол подъёма и спуска', () => {
+    const up = slopeAngleAtDistance(grade10, heights, 0.05)!;
+    expect(up).toBeCloseTo(5.710593, 5);
+
+    const down = slopeAngleAtDistance(grade10, [10, 0], 0.05)!;
+    expect(down).toBeCloseTo(-5.710593, 5);
+  });
+
+  it('на ровном участке даёт ноль', () => {
+    expect(slopeAngleAtDistance([0, 1, 2], [100, 100, 100], 1)).toBeCloseTo(0, 10);
+  });
+
+  it('на краях использует одностороннее окно', () => {
+    const atStart = slopeAngleAtDistance(grade10, heights, 0)!;
+    const atEnd = slopeAngleAtDistance(grade10, heights, 0.1)!;
+    expect(atStart).toBeCloseTo(5.710593, 5);
+    expect(atEnd).toBeCloseTo(5.710593, 5);
+  });
+
+  it('не зависит от выхода за границы маршрута', () => {
+    expect(slopeAngleAtDistance(grade10, heights, -5)).toBeCloseTo(5.710593, 5);
+    expect(slopeAngleAtDistance(grade10, heights, 50)).toBeCloseTo(5.710593, 5);
   });
 });

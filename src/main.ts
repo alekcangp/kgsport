@@ -3,8 +3,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import QRCode from 'qrcode';
 import type { Track } from './types';
-import { length, lineString } from '@turf/turf';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, valueAtDistance } from './track-utils';
+import { length, lineString, nearestPointOnLine } from '@turf/turf';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, slopeAngleAtDistance, valueAtDistance } from './track-utils';
 import { imageryTileUrls, terrainTileUrls, warmTileCache } from './tile-cache';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -38,6 +38,9 @@ const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)
 
 let isFlying = false;
 const CRUISE_SPEED_KMH = 120;
+const GLIDE_MS = 250;
+const TRACK_CLICK_TOLERANCE_PX = 24;
+const TRACK_HIT_LAYER_IDS = ['track-ascent-line', 'track-descent-line', 'track-flat-line'] as const;
 let cruiseDists: number[] = [];
 let cruiseDistanceKm = 0;
 let lastFrameTime: number | null = null;
@@ -407,13 +410,17 @@ function showViewer(t: Track) {
       <header class="map-toolbar">
         <button id="back" class="map-back" type="button">${uiIcon('left')} К трассам</button>
         <div class="map-track-heading"><h1>${trackName}</h1></div>
-        <div class="map-track-distance"><strong>${t.distanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}</strong><span>КМ</span></div>
+        <div class="map-track-stats" aria-label="Показатели текущей точки маршрута">
+          <div class="map-stat"><span>УГОЛ</span><strong id="stat-angle">—</strong></div>
+          <div class="map-stat"><span>ВЫСОТА</span><strong id="stat-elevation">—</strong></div>
+          <div class="map-stat"><span>ДИСТАНЦИЯ</span><strong id="stat-distance">—</strong></div>
+        </div>
         <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} ${fileFormat}</button></div>
       </header>
       <div id="map" class="track-map"></div>
       <section class="profile-panel" aria-label="Профиль высот маршрута">
-        <div class="profile-heading"><strong>ПРОФИЛЬ ВЫСОТ</strong><span>Нажмите на график, чтобы посмотреть точку маршрута</span></div>
-        <canvas id="profile" class="profile-canvas"></canvas>
+        <div class="profile-heading"><strong>ПРОФИЛЬ ВЫСОТ</strong><span>Нажмите на график или трек на карте, чтобы выбрать точку</span></div>
+        <canvas id="profile" class="profile-canvas" tabindex="0" aria-label="Профиль высот: стрелки меняют положение метки"></canvas>
       </section>
     </div>`;
   document.getElementById('back')!.addEventListener('click', () => { returnToGallery(); });
@@ -463,6 +470,8 @@ async function initViewer(t: Track, requestId: number) {
   const coords = await parseCoords(t.file, text);
   if (requestId !== viewerRequestId) return;
   if (coords.length < 2) throw new Error(`В маршруте ${t.file} недостаточно точек`);
+  dists = cumulativeDistancesKm(coords);
+  updateMarkerStats(true);
   const maplibre = await loadMaplibre();
   if (requestId !== viewerRequestId) return;
 
@@ -502,77 +511,253 @@ async function initViewer(t: Track, requestId: number) {
   const setCruiseState = (active: boolean) => {
     cruiseButton.innerHTML = active ? `${uiIcon('close')} Стоп` : `${uiIcon('play')} Круиз`;
   };
+  const stopCruise = () => {
+    if (flyRafId !== null) cancelAnimationFrame(flyRafId);
+    flyRafId = null;
+    isFlying = false;
+    lastFrameTime = null;
+    setCruiseState(false);
+  };
+
+  const totalDistanceKm = () => dists[dists.length - 1] ?? 0;
+
+  /** Ставит метку на дистанцию и синхронизирует карту, профиль и тулбар. */
+  const applySeek = (km: number, options: { pan?: boolean } = {}) => {
+    if (!dists.length) return;
+    const total = totalDistanceKm();
+    const target = Math.min(Math.max(km, 0), total);
+    const position = positionAtDistance(dists, coords, target);
+    if (!position) return;
+
+    profileDistanceKm = target;
+    cruiseDistanceKm = target;
+    currentIdx = position.index;
+
+    if (flyMarker) {
+      const el = flyMarker.getElement();
+      el.style.display = target <= 0 || target >= total ? 'none' : '';
+      flyMarker.setLngLat([position.lng, position.lat]);
+    }
+
+    if (options.pan !== false) {
+      try { map.panTo([position.lng, position.lat], { animate: false, duration: 0 }); } catch {}
+    }
+
+    redrawProfile();
+    updateMarkerStats();
+  };
+
+  let seekRafId: number | null = null;
+  const cancelSeekAnimation = () => {
+    if (seekRafId !== null) cancelAnimationFrame(seekRafId);
+    seekRafId = null;
+  };
+
+  /** Плавно подводит метку к дистанции — короткое нажатие на профиль. */
+  const glideToDistance = (km: number) => {
+    cancelSeekAnimation();
+    stopCruise();
+    const total = totalDistanceKm();
+    if (!total) return;
+
+    const target = Math.min(Math.max(km, 0), total);
+    const from = profileDistanceKm;
+    if (Math.abs(target - from) < 1e-6) {
+      applySeek(target);
+      updateMarkerStats(true);
+      return;
+    }
+
+    const started = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - started) / GLIDE_MS);
+      const eased = 1 - (1 - t) ** 3;
+      applySeek(from + (target - from) * eased);
+      if (t < 1) seekRafId = requestAnimationFrame(step);
+      else {
+        seekRafId = null;
+        updateMarkerStats(true);
+      }
+    };
+    seekRafId = requestAnimationFrame(step);
+  };
+
+  /** Ручная установка метки: останавливает круиз. */
+  const seekToDistance = (km: number, options: { pan?: boolean } = {}) => {
+    cancelSeekAnimation();
+    stopCruise();
+    applySeek(km, options);
+    updateMarkerStats(true);
+  };
+
+  const flyStep = (timestamp: number) => {
+    if (!isFlying) return;
+
+    const total = cruiseDists[cruiseDists.length - 1] ?? 0;
+    if (!(total > 0)) return;
+    if (lastFrameTime !== null) {
+      const deltaSeconds = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+      cruiseDistanceKm = (cruiseDistanceKm + (CRUISE_SPEED_KMH / 3600) * deltaSeconds) % total;
+    }
+    lastFrameTime = timestamp;
+
+    applySeek(cruiseDistanceKm);
+    if (isFlying) flyRafId = requestAnimationFrame(flyStep);
+  };
+
   cruiseButton.addEventListener('click', () => {
     if (!isFlying) {
       isFlying = true;
-      if (currentIdx >= coords.length - 1) currentIdx = 0;
       cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
-      cruiseDistanceKm = cruiseDists[currentIdx] ?? 0;
-      profileDistanceKm = cruiseDistanceKm;
+      const total = cruiseDists[cruiseDists.length - 1] ?? 0;
+      if (profileDistanceKm >= total - 1e-9) profileDistanceKm = 0;
+      cruiseDistanceKm = profileDistanceKm;
       lastFrameTime = null;
-      if (!flyMarker) flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
+      if (!flyMarker) {
+        flyMarker = new maplibre.Marker({ color: '#f59e0b', subpixelPositioning: true })
+          .setLngLat(coords[currentIdx] as [number, number])
+          .addTo(map);
+      }
       setCruiseState(true);
-      flyRafId = requestAnimationFrame((timestamp) => flyStep(map, coords, timestamp));
+      flyRafId = requestAnimationFrame(flyStep);
     } else {
-      isFlying = false;
-      if (flyRafId) cancelAnimationFrame(flyRafId); flyRafId = null;
-      setCruiseState(false);
+      stopCruise();
     }
   });
+
+  map.on('click', (event) => {
+    if (!dists.length) return;
+    const snapped = nearestPointOnLine(
+      lineString(coords),
+      [event.lngLat.lng, event.lngLat.lat],
+      { units: 'kilometers' },
+    );
+    const snappedPoint = snapped.geometry.coordinates as [number, number];
+    const screen = map.project(snappedPoint);
+    if (Math.hypot(screen.x - event.point.x, screen.y - event.point.y) > TRACK_CLICK_TOLERANCE_PX) return;
+
+    const alongKm = snapped.properties.totalDistance ?? snapped.properties.location;
+    if (typeof alongKm !== 'number' || !Number.isFinite(alongKm)) return;
+    seekToDistance(alongKm, { pan: false });
+  });
+
+  map.on('mousemove', (event) => {
+    const layers = TRACK_HIT_LAYER_IDS.filter(layer => map.getLayer(layer));
+    if (!layers.length) return;
+    const hits = map.queryRenderedFeatures(event.point, { layers });
+    map.getCanvas().style.cursor = hits.length ? 'pointer' : '';
+  });
+
   document.getElementById('download')!.addEventListener('click', () => openDownloadPopup(t));
   map.on('load', () => {
+    const startEl = document.createElement('div');
+    startEl.className = 'track-marker start';
+    startEl.textContent = 'С';
+    new maplibre.Marker({ element: startEl, anchor: 'bottom', subpixelPositioning: true })
+      .setLngLat(coords[0] as [number, number]).addTo(map);
 
-      const startEl = document.createElement('div');
-      startEl.className = 'track-marker start';
-      startEl.textContent = 'С';
-      new maplibre.Marker({ element: startEl, anchor: 'bottom' }).setLngLat(coords[0] as [number, number]).addTo(map);
-      const finishEl = document.createElement('div');
-      finishEl.className = 'track-marker finish';
-      finishEl.textContent = 'Ф';
-      new maplibre.Marker({ element: finishEl, anchor: 'bottom' }).setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
-      flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[0] as [number, number]).addTo(map);
-      {
-        const el = flyMarker.getElement();
-        if (el) el.style.display = 'none';
+    const finishEl = document.createElement('div');
+    finishEl.className = 'track-marker finish';
+    finishEl.textContent = 'Ф';
+    new maplibre.Marker({ element: finishEl, anchor: 'bottom', subpixelPositioning: true })
+      .setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
+
+    if (!flyMarker) {
+      flyMarker = new maplibre.Marker({ color: '#f59e0b', subpixelPositioning: true })
+        .setLngLat(coords[currentIdx] as [number, number])
+        .addTo(map);
+    }
+    {
+      const el = flyMarker.getElement();
+      if (el) el.style.display = 'none';
+    }
+
+    profileAttempted = true;
+    void drawProfile(coords, requestId).catch(error => console.error('Profile drawing error:', error));
+    setTimeout(() => {
+      if (requestId === viewerRequestId) {
+        void drawProfile(coords, requestId).catch(error => console.error('Profile drawing error:', error));
       }
-      profileAttempted = true;
-      void drawProfile(coords, requestId).catch(error => console.error('Profile drawing error:', error));
-      setTimeout(() => {
-        if (requestId === viewerRequestId) {
-          void drawProfile(coords, requestId).catch(error => console.error('Profile drawing error:', error));
-        }
-      }, 2000);
-      const profileCanvas = document.getElementById('profile') as HTMLCanvasElement;
-      profileCanvas.addEventListener('click', (e) => {
-        if (!dists.length) return;
-        const rect = profileCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const w = profileCanvas.clientWidth || 1;
-        const total = dists[dists.length - 1] || 1;
-        let best = 0, bestDist = Infinity;
-        dists.forEach((d, idx) => {
-          const px = (d / total) * w;
-          const dd = Math.abs(px - x);
-          if (dd < bestDist) { bestDist = dd; best = idx; }
-        });
-        currentIdx = best;
-        profileDistanceKm = dists[best] ?? 0;
-        if (isFlying) {
-          cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
-          cruiseDistanceKm = cruiseDists[best] ?? 0;
-          lastFrameTime = null;
-        }
-        if (flyMarker) {
-          const el = flyMarker.getElement();
-          if (best === 0 || best === coords.length - 1) { el.style.display = 'none'; }
-          else { el.style.display = ''; }
-          flyMarker.setLngLat(coords[best] as [number, number]);
-        }
-        else flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo(map);
-        redrawProfile();
-      });
+    }, 2000);
 
+    const profileCanvas = document.getElementById('profile') as HTMLCanvasElement;
+    let activePointerId: number | null = null;
+    let dragging = false;
+    let pressClientX = 0;
+    let pointerTargetKm = 0;
+    let pointerSeekRaf: number | null = null;
+
+    const kmFromClientX = (clientX: number) => {
+      const rect = profileCanvas.getBoundingClientRect();
+      const width = rect.width || 1;
+      const total = dists[dists.length - 1] ?? 0;
+      const ratio = Math.min(Math.max((clientX - rect.left) / width, 0), 1);
+      return ratio * total;
+    };
+
+    const flushPointerSeek = () => {
+      pointerSeekRaf = null;
+      applySeek(pointerTargetKm);
+    };
+
+    const queuePointerSeek = (km: number) => {
+      pointerTargetKm = km;
+      if (pointerSeekRaf !== null) return;
+      pointerSeekRaf = requestAnimationFrame(flushPointerSeek);
+    };
+
+    const endPointerSeek = (event: PointerEvent) => {
+      if (activePointerId !== event.pointerId) return;
+      if (dragging) {
+        if (pointerSeekRaf !== null) { cancelAnimationFrame(pointerSeekRaf); pointerSeekRaf = null; }
+        applySeek(kmFromClientX(event.clientX));
+        updateMarkerStats(true);
+      }
+      if (profileCanvas.hasPointerCapture(event.pointerId)) profileCanvas.releasePointerCapture(event.pointerId);
+      activePointerId = null;
+      dragging = false;
+    };
+
+    profileCanvas.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (!dists.length) return;
+      activePointerId = event.pointerId;
+      dragging = false;
+      pressClientX = event.clientX;
+      profileCanvas.focus({ preventScroll: true });
+      event.preventDefault();
+      try { profileCanvas.setPointerCapture(event.pointerId); } catch { /* синтетические события без захвата */ }
+      glideToDistance(kmFromClientX(event.clientX));
     });
+
+    profileCanvas.addEventListener('pointermove', (event) => {
+      if (activePointerId !== event.pointerId) return;
+      if (!dragging && Math.abs(event.clientX - pressClientX) < 3) return;
+      if (!dragging) {
+        dragging = true;
+        cancelSeekAnimation();
+      }
+      event.preventDefault();
+      queuePointerSeek(kmFromClientX(event.clientX));
+    });
+
+    profileCanvas.addEventListener('pointerup', endPointerSeek);
+    profileCanvas.addEventListener('pointercancel', endPointerSeek);
+
+    profileCanvas.addEventListener('keydown', (event) => {
+      if (!dists.length) return;
+      const total = dists[dists.length - 1] ?? 0;
+      const stepKm = event.shiftKey ? 0.5 : 0.05;
+      let next: number | null = null;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = profileDistanceKm - stepKm;
+      else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = profileDistanceKm + stepKm;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = total;
+      if (next === null) return;
+      event.preventDefault();
+      seekToDistance(next);
+    });
+  });
 }
 
 async function fetchElevations(coords: number[][]): Promise<number[]> {
@@ -726,6 +911,7 @@ async function drawProfile(coords: number[][], requestId = viewerRequestId) {
     elevations = nextElevations;
     dists = cumulativeDistancesKm(coords);
     profileBase = null;
+    updateMarkerStats(true);
     // Если высоты неизвестны (все 0) — не закрашиваем трек серым
     if (!elevations.every(e => e === 0)) {
       renderTrackSlope(coords, elevations);
@@ -797,6 +983,57 @@ function renderProfileBase(w: number, h: number): HTMLCanvasElement | null {
   return base;
 }
 
+const kmFormatter = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 3,
+  maximumFractionDigits: 3,
+});
+let lastMarkerStatsAt = 0;
+
+function formatKm(km: number): string {
+  return kmFormatter.format(km);
+}
+
+/** Обновляет показатели текущей точки в тулбаре (не чаще 10 раз в секунду). */
+function updateMarkerStats(force = false) {
+  const angleEl = document.getElementById('stat-angle');
+  const elevationEl = document.getElementById('stat-elevation');
+  const distanceEl = document.getElementById('stat-distance');
+  if (!angleEl || !elevationEl || !distanceEl) return;
+
+  const now = performance.now();
+  if (!force && now - lastMarkerStatsAt < 100) return;
+  lastMarkerStatsAt = now;
+
+  if (!dists.length) {
+    angleEl.textContent = '—';
+    elevationEl.textContent = '—';
+    distanceEl.textContent = '—';
+    return;
+  }
+
+  const total = dists[dists.length - 1] ?? 0;
+  const km = Math.min(Math.max(profileDistanceKm, 0), total);
+  distanceEl.textContent = `${formatKm(km)} км`;
+
+  if (!elevations.length) {
+    angleEl.textContent = '—';
+    elevationEl.textContent = '—';
+    return;
+  }
+
+  const height = valueAtDistance(dists, elevations, km);
+  elevationEl.textContent = height === null ? '—' : `${Math.round(height)} м`;
+
+  const angle = slopeAngleAtDistance(dists, elevations, km);
+  if (angle === null) {
+    angleEl.textContent = '—';
+    return;
+  }
+  const rounded = Math.round(Math.abs(angle));
+  const arrow = Math.abs(angle) < 0.5 ? '→' : angle > 0 ? '↗' : '↘';
+  angleEl.textContent = `${arrow} ${rounded}°`;
+}
+
 function redrawProfile() {
   if (!elevations.length || !dists.length) return;
   const canvas = document.getElementById('profile') as HTMLCanvasElement | null;
@@ -835,7 +1072,7 @@ function redrawProfile() {
   ctx.arc(hx, hyy, 4, 0, Math.PI * 2);
   ctx.fill();
   ctx.font = '600 12px sans-serif';
-  const label = height.toFixed(1) + ' м · ' + km.toFixed(2) + ' км';
+  const label = Math.round(height) + ' м · ' + formatKm(km) + ' км';
   const labelPadding = 6;
   const labelWidth = ctx.measureText(label).width + labelPadding * 2;
   const labelX = Math.min(Math.max(hx + 6, 4), Math.max(4, w - labelWidth - 4));
@@ -849,34 +1086,6 @@ function redrawProfile() {
   ctx.fillText(label, labelX + labelPadding, labelY + 14);
 }
 
-
-function flyStep(map: MapLibreMap, coords: number[][], timestamp: number) {
-  if (!isFlying) return;
-
-  const total = cruiseDists[cruiseDists.length - 1] ?? 0;
-  if (!(total > 0)) return;
-  if (lastFrameTime !== null) {
-    const deltaSeconds = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
-    cruiseDistanceKm = (cruiseDistanceKm + (CRUISE_SPEED_KMH / 3600) * deltaSeconds) % total;
-  }
-  lastFrameTime = timestamp;
-
-  const position = positionAtDistance(cruiseDists, coords, cruiseDistanceKm);
-  if (!position) return;
-
-  const i = position.index;
-  if (flyMarker) {
-    const el = flyMarker.getElement();
-    if (i === 0 || i === coords.length - 1) { el.style.display = 'none'; }
-    else { el.style.display = ''; }
-    flyMarker.setLngLat([position.lng, position.lat]);
-  }
-  try { map.panTo([position.lng, position.lat], { animate: false, duration: 0 }); } catch {}
-  currentIdx = i;
-  profileDistanceKm = cruiseDistanceKm;
-  redrawProfile();
-  if (isFlying) flyRafId = requestAnimationFrame((nextTimestamp) => flyStep(map, coords, nextTimestamp));
-}
 
 function downloadTrack(file: string) {
   const a = document.createElement('a');
