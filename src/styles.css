@@ -29,6 +29,17 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   color: var(--map-deep);
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
 }
+.map-view::before {
+  position: fixed;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--map-forest);
+  content: '';
+  pointer-events: none;
+}
 .map-toolbar {
   z-index: 2;
   display: grid;
@@ -176,7 +187,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   --lime: #c7f657;
   --paper: #f3f1e8;
   min-height: 100vh;
-  overflow: hidden;
+  overflow: visible;
   background: var(--forest-deep);
   color: #f5f6f0;
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;

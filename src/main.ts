@@ -78,11 +78,11 @@ function setThemeColor(color: string) {
 
 function resetScrollPosition() {
   const scrollingElement = document.scrollingElement;
-  if (scrollingElement) scrollingElement.scrollTop = 0;
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-  document.getElementById('home-screen')?.scrollTo(0, 0);
-  document.getElementById('routes-screen')?.scrollTo(0, 0);
+  if (scrollingElement) scrollingElement.scrollTo({ top: 0, behavior: 'instant' });
+  document.documentElement.scrollTo({ top: 0, behavior: 'instant' });
+  document.body.scrollTo({ top: 0, behavior: 'instant' });
+  document.getElementById('home-screen')?.scrollTo({ top: 0, behavior: 'instant' });
+  document.getElementById('routes-screen')?.scrollTo({ top: 0, behavior: 'instant' });
 }
 
 /** Загружает видео только когда главный экран видим и анимация не отключена. */
