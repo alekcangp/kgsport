@@ -72,6 +72,7 @@ function isHomeScreenVisible(): boolean {
 
 function setThemeColor(color: string) {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', color);
+  document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', color);
   document.documentElement.style.backgroundColor = color;
   document.body.style.backgroundColor = color;
 }
@@ -391,10 +392,12 @@ async function drawThumbnail(t: Track) {
   const text = await res.text();
   const coords = await parseCoords(t.file, text);
   const ctx = canvas.getContext('2d')!;
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const w = Math.max(1, canvas.clientWidth || canvas.offsetWidth || 360);
+  const h = Math.max(1, canvas.clientHeight || canvas.offsetHeight || 175);
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  ctx.scale(dpr, dpr);
   ctx.fillStyle = '#152821';
   ctx.fillRect(0, 0, w, h);
   if (coords.length < 2) return;
