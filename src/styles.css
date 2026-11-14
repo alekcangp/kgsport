@@ -15,6 +15,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   --map-deep: #0a1713;
   --map-lime: #c7f657;
   --map-paper: #f3f1e8;
+  box-sizing: border-box;
   display: flex;
   position: fixed;
   z-index: 1000;
@@ -25,20 +26,10 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--map-forest);
   color: var(--map-deep);
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
-}
-.map-view::before {
-  position: fixed;
-  z-index: 3;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: env(safe-area-inset-top, 0px);
-  background: var(--map-forest);
-  content: '';
-  pointer-events: none;
 }
 .map-toolbar {
   z-index: 2;
@@ -113,7 +104,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 }
 @media (max-width: 620px) {
   .map-view { min-height: 440px; }
-  .map-toolbar { min-height: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: calc(7px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 7px max(12px, env(safe-area-inset-left, 0px)); }
+  .map-toolbar { min-height: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 7px max(12px, env(safe-area-inset-right, 0px)) 7px max(12px, env(safe-area-inset-left, 0px)); }
   .map-back { min-height: 36px; justify-self: start; padding: 0 10px; font-size: 11px; }
   .map-track-heading { grid-column: 1; grid-row: 2; }
   .map-track-heading h1 { font-size: 16px; }
@@ -145,7 +136,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 @media (max-width: 760px) and (max-height: 450px) {
   .map-view { height: 100svh; height: 100dvh; min-height: 0; }
   .track-map { min-height: 0; }
-  .map-toolbar { gap: 4px 8px; padding-top: max(4px, env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
+  .map-toolbar { gap: 4px 8px; padding-top: 4px; padding-bottom: 4px; }
   .map-back, .map-action { min-height: 36px; }
   .map-track-heading h1 { font-size: 14px; }
   .map-stat strong { font-size: 11px; }
@@ -156,7 +147,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 }
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
   .map-view { height: 100vh; height: 100dvh; min-height: 0; }
-  .map-toolbar { flex: 0 0 auto; gap: 4px 8px; padding: max(4px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px)) 4px max(8px, env(safe-area-inset-left, 0px)); }
+  .map-toolbar { flex: 0 0 auto; gap: 4px 8px; padding: 4px max(8px, env(safe-area-inset-right, 0px)) 4px max(8px, env(safe-area-inset-left, 0px)); }
   .map-back, .map-action { min-height: 38px; }
   .map-track-heading h1 { font-size: 14px; }
   .map-stat strong { font-size: 11px; }
@@ -440,7 +431,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .site-header { height: 60px; flex-basis: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .header-kicker { gap: 7px; font-size: 8px; letter-spacing: .1em; }
   .header-link { gap: 6px; font-size: 8px; letter-spacing: .06em; }
-  .home-screen { min-height: 100vh; min-height: 100svh; }
+  .home-screen { box-sizing: border-box; min-height: 100vh; min-height: 100svh; padding-top: env(safe-area-inset-top, 0px); }
   .home-screen > .hero-section { min-height: 0; flex: 1; }
   .hero-section { display: flex; min-height: auto; flex-direction: column; align-items: stretch; justify-content: center; gap: 23px; padding: 31px 22px 30px; }
   .hero-copy { padding-bottom: 0; }
@@ -467,7 +458,8 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .qr-copy strong { font-size: 10px; }
   .qr-copy { gap: 4px; }
   .qr-overline { font-size: 7px; }
-  .routes-header { height: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+  .routes-screen { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); }
+  .routes-header { top: env(safe-area-inset-top, 0px); height: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .routes-section { padding: 44px 21px 23px; }
   .section-heading { display: block; margin-bottom: 24px; }
   .section-heading h2 { font-size: clamp(32px, 9vw, 44px); }
