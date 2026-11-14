@@ -70,6 +70,10 @@ function isHomeScreenVisible(): boolean {
   return !!homeScreen && !homeScreen.hidden;
 }
 
+function setThemeColor(color: string) {
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', color);
+}
+
 /** Загружает видео только когда главный экран видим и анимация не отключена. */
 function syncLogoMotion() {
   const video = homeVideo;
@@ -229,6 +233,7 @@ function showScreen(screen: 'home' | 'routes') {
 
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
+  setThemeColor(screen === 'home' ? '#102536' : '#f3f1e8');
   window.scrollTo({ top: 0, behavior: 'instant' });
   syncLogoMotion();
 
@@ -408,6 +413,7 @@ async function drawThumbnail(t: Track) {
 function showViewer(t: Track) {
   const requestId = ++viewerRequestId;
   homeVideo = null;
+  setThemeColor('#10251f');
   window.scrollTo({ top: 0, behavior: 'instant' });
   document.body.classList.add('map-open');
   const trackName = escapeHtml(t.name);

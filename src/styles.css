@@ -24,7 +24,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--map-deep);
+  background: var(--map-forest);
   color: var(--map-deep);
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
 }
