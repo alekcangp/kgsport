@@ -21,7 +21,7 @@ let closeActiveDownloadPopup: (() => void) | null = null;
 
 let isFlying = false;
 let flyProgress = 0;
-const CRUISE_STEP = 0.2;
+const CRUISE_STEP = 0.15;
 let flyStepSize = CRUISE_STEP;
 let flyRafId: number | null = null;
 
@@ -99,7 +99,10 @@ function renderGallery(tracks: Track[]) {
               <div class="art-orbit art-orbit-two"></div>
               <div class="snowfall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
               <span class="art-label"><span class="art-label-dot"></span> ТВОЯ ЗИМНЯЯ ТОЧКА СТАРТА</span>
-              <img class="hero-logo" src="./og-image.png" alt="Крутая горка — лыжные трассы">
+              <div class="hero-logo-frame" role="img" aria-label="Крутая горка — лыжные трассы">
+                <video id="hero-logo-video" class="hero-logo-video" autoplay muted loop playsinline preload="none" poster="./og-image.png" aria-hidden="true"></video>
+                <img class="hero-logo-fallback" src="./og-image.png" alt="" aria-hidden="true">
+              </div>
               <span class="art-coordinate">55°21′N &nbsp; 73°13′E</span>
             </div>
           </div>
@@ -142,6 +145,22 @@ function renderGallery(tracks: Track[]) {
   document.getElementById('show-routes')!.addEventListener('click', () => showScreen('routes'));
   document.getElementById('show-home')!.addEventListener('click', () => showScreen('home'));
 
+  const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const logoVideo = document.getElementById('hero-logo-video') as HTMLVideoElement;
+  const syncLogoMotion = () => {
+    if (logoMotionPreference.matches) {
+      logoVideo.pause();
+      logoVideo.removeAttribute('src');
+      logoVideo.load();
+    } else if (!logoVideo.hasAttribute('src')) {
+      logoVideo.src = './og-video.mp4';
+      logoVideo.load();
+      void logoVideo.play().catch(() => {});
+    }
+  };
+  syncLogoMotion();
+  logoMotionPreference.addEventListener('change', syncLogoMotion);
+
   const grid = document.getElementById('grid')!;
   for (const t of gpxTracks) {
     const card = document.createElement('div');
@@ -152,7 +171,6 @@ function renderGallery(tracks: Track[]) {
     card.innerHTML = `
       <div class="track-art">
         <canvas class="canvas-thumb" data-id="${t.id}" aria-hidden="true"></canvas>
-        <span class="track-number">ТРЕК <b>${t.id}</b></span>
         <span class="track-open">${uiIcon('northeast')}</span>
       </div>
       <div class="track-card-content">
@@ -320,7 +338,7 @@ async function initViewer(t: Track, requestId: number) {
       isFlying = true;
       if (currentIdx >= coords.length - 1) { currentIdx = 0; flyProgress = 0; }
       else { flyProgress = currentIdx; }
-      flyStepSize = 0.3;
+      flyStepSize = CRUISE_STEP;
       if (!flyMarker) flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
       document.getElementById('cruise')!.textContent = 'Стоп';
       flyRafId = requestAnimationFrame(() => flyStep(map, coords));
@@ -573,13 +591,15 @@ function redrawProfile() {
   // grid
   ctx.strokeStyle = 'rgba(225, 232, 216, .16)';
   ctx.lineWidth = 1;
-  for (let g = 0; g <= 4; g++) {
-    const gy = (g / 4) * (h - 30) + 10;
+  const gridIntervals = Math.max(1, Math.min(4, Math.floor((h - 30) / 28)));
+  for (let g = 0; g <= gridIntervals; g++) {
+    const fraction = g / gridIntervals;
+    const gy = fraction * (h - 30) + 10;
     ctx.beginPath();
     ctx.moveTo(0, gy);
     ctx.lineTo(w, gy);
     ctx.stroke();
-    const val = miny + (1 - g/4) * range;
+    const val = miny + (1 - fraction) * range;
     ctx.fillStyle = '#bdc7b8';
     ctx.font = '10px sans-serif';
     ctx.fillText(val.toFixed(0) + ' м', 4, gy - 2);
@@ -624,10 +644,19 @@ function redrawProfile() {
   ctx.arc(hx, hyy, 4, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#f3f1e8';
-  ctx.font = '12px sans-serif';
-  const tx = Math.min(Math.max(hx + 6, 4), w - 120);
-const ty = (hyy - 6 < 12) ? hyy + 14 : hyy - 6;
-ctx.fillText((elevations[hi] ?? 0).toFixed(1) + ' м · ' + (dists[hi] ?? 0).toFixed(2) + ' км', tx, ty);
+  ctx.font = '600 12px sans-serif';
+  const label = (elevations[hi] ?? 0).toFixed(1) + ' м · ' + (dists[hi] ?? 0).toFixed(2) + ' км';
+  const labelPadding = 6;
+  const labelWidth = ctx.measureText(label).width + labelPadding * 2;
+  const labelX = Math.min(Math.max(hx + 6, 4), Math.max(4, w - labelWidth - 4));
+  const labelY = Math.max(2, Math.min((hyy - 6 < 12) ? hyy + 2 : hyy - 18, h - 22));
+  ctx.fillStyle = 'rgba(7, 20, 16, .92)';
+  ctx.fillRect(labelX, labelY, labelWidth, 20);
+  ctx.strokeStyle = 'rgba(199, 246, 87, .75)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(labelX + .5, labelY + .5, labelWidth - 1, 19);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, labelX + labelPadding, labelY + 14);
 }
 
 
