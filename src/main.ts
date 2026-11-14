@@ -5,6 +5,11 @@ maplibregl.setWorkerUrl('./maplibre-gl-worker.mjs');
 import QRCode from 'qrcode';
 import type { Track } from './types';
 import { length, lineString } from '@turf/turf';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates } from './track-utils';
+import { registerSW } from 'virtual:pwa-register';
+
+registerSW({ immediate: true });
+
 const app = document.getElementById('app')!;
 
 let flyMarker: maplibregl.Marker | null = null;
@@ -16,7 +21,8 @@ let profileLoading = false;
 let profileAttempted = false;
 let viewerRequestId = 0;
 let closeActiveDownloadPopup: (() => void) | null = null;
-
+let homeVideo: HTMLVideoElement | null = null;
+const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 
 let isFlying = false;
@@ -41,11 +47,81 @@ function uiIcon(name: keyof typeof UI_ICONS): string {
   return `<svg class="ui-icon ui-icon-${name}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${UI_ICONS[name]}</svg>`;
 }
 
+function isHomeScreenVisible(): boolean {
+  const homeScreen = document.getElementById('home-screen');
+  return !!homeScreen && !homeScreen.hidden;
+}
+
+/** Загружает видео только когда главный экран видим и анимация не отключена. */
+function syncLogoMotion() {
+  const video = homeVideo;
+  if (!video) return;
+
+  const shouldPlay = !logoMotionPreference.matches && isHomeScreenVisible();
+  if (!shouldPlay) {
+    video.pause();
+    if (video.hasAttribute('src')) {
+      video.removeAttribute('src');
+      video.load();
+    }
+    return;
+  }
+
+  if (!video.hasAttribute('src')) {
+    video.src = './og-video.mp4';
+    video.load();
+    void video.play().catch(() => {});
+  }
+}
+
+logoMotionPreference.addEventListener('change', syncLogoMotion);
 
 async function loadTracks(): Promise<Track[]> {
   const res = await fetch('./tracks.json');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const data: unknown = await res.json();
+  if (!Array.isArray(data)) throw new Error('Некорректный формат tracks.json');
+  return data as Track[];
+}
+
+function destroyMap() {
+  if (flyRafId !== null) cancelAnimationFrame(flyRafId);
+  flyRafId = null;
+  isFlying = false;
+  if (flyMarker) {
+    flyMarker.remove();
+    flyMarker = null;
+  }
+  const map = (window as any).__map as maplibregl.Map | undefined;
+  if (map) {
+    try {
+      map.remove();
+    } catch {
+      // Карта уже могла быть удалена.
+    }
+    delete (window as any).__map;
+  }
+}
+
+function showLoadError(error: unknown) {
+  console.error('Track loading error:', error);
+  closeActiveDownloadPopup?.();
+  homeVideo = null;
+  destroyMap();
+  app.innerHTML = `
+    <div class="app-error" role="alert">
+      <div class="app-error-panel">
+        <span class="app-error-eyebrow">КРУТАЯ ГОРКА · ОМСК</span>
+        <h1>Не удалось загрузить трассы</h1>
+        <p>Проверьте подключение к интернету и попробуйте ещё раз.</p>
+        <button id="retry-load" class="primary-cta" type="button">Повторить</button>
+      </div>
+    </div>`;
+  const retryButton = document.getElementById('retry-load') as HTMLButtonElement;
+  retryButton.addEventListener('click', () => {
+    retryButton.disabled = true;
+    void init();
+  });
 }
 
 function showScreen(screen: 'home' | 'routes') {
@@ -56,13 +132,17 @@ function showScreen(screen: 'home' | 'routes') {
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
   window.scrollTo({ top: 0, behavior: 'instant' });
+  syncLogoMotion();
 
   if (screen === 'routes') {
-    document.querySelectorAll<HTMLCanvasElement>('.canvas-thumb:not([data-drawn])').forEach((canvas) => {
+    document.querySelectorAll<HTMLCanvasElement>('.canvas-thumb:not([data-drawn]):not([data-drawing])').forEach((canvas) => {
       const track = currentTracks.find(item => item.id === canvas.dataset.id);
       if (!track) return;
-      canvas.dataset.drawn = 'true';
-      void drawThumbnail(track).catch(error => console.error(`Track thumbnail error (${track.file}):`, error));
+      canvas.dataset.drawing = 'true';
+      void drawThumbnail(track)
+        .then(() => { canvas.dataset.drawn = 'true'; })
+        .catch(error => console.error(`Track thumbnail error (${track.file}):`, error))
+        .finally(() => { delete canvas.dataset.drawing; });
     });
   }
 }
@@ -71,9 +151,9 @@ let currentTracks: Track[] = [];
 
 function renderGallery(tracks: Track[]) {
   currentTracks = tracks;
-  const gpxTracks = tracks.filter(t => t.file.toLowerCase().endsWith('.gpx'));
-  const maxDistanceKm = Math.max(0, ...gpxTracks.map(track => track.distanceKm));
-  const maxAscentM = Math.max(0, ...gpxTracks.map(track => track.ascentM));
+  const viewableTracks = tracks.filter(t => isViewableTrackFile(t.file));
+  const maxDistanceKm = Math.max(0, ...viewableTracks.map(track => track.distanceKm));
+  const maxAscentM = Math.max(0, ...viewableTracks.map(track => track.ascentM));
   const siteUrl = 'https://alekcangp.github.io/kgsport/';
 
   app.innerHTML = `
@@ -108,7 +188,7 @@ function renderGallery(tracks: Track[]) {
           </div>
           <div class="hero-bottom">
             <div class="hero-facts" aria-label="Кратко о трассах">
-              <div class="hero-fact"><strong>${gpxTracks.length}</strong><span>МАРШРУТОВ</span></div>
+              <div class="hero-fact"><strong>${viewableTracks.length}</strong><span>МАРШРУТОВ</span></div>
               <div class="hero-fact"><strong>${maxDistanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}<i> км</i></strong><span>МАКС. ДЛИНА</span></div>
               <div class="hero-fact"><strong>${maxAscentM}<i> м</i></strong><span>НАБОР ВЫСОТЫ</span></div>
             </div>
@@ -130,7 +210,7 @@ function renderGallery(tracks: Track[]) {
             <div class="section-heading">
               <div><div class="section-eyebrow"><span>01</span> ВЫБИРАЙ И ВЫХОДИ</div><h2 id="routes-title">Маршруты <span>на любой темп</span></h2></div>
               <div class="route-highlights" aria-label="Краткая информация о трассах">
-                <div class="route-highlight"><span>МАРШРУТОВ</span><strong>${gpxTracks.length}</strong></div>
+                <div class="route-highlight"><span>МАРШРУТОВ</span><strong>${viewableTracks.length}</strong></div>
                 <div class="route-highlight"><span>МАКС. ДЛИНА</span><strong>${maxDistanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} <i>км</i></strong></div>
                 <div class="route-highlight"><span>НАБОР ВЫСОТЫ</span><strong>до ${maxAscentM} <i>м</i></strong></div>
               </div>
@@ -145,36 +225,27 @@ function renderGallery(tracks: Track[]) {
   document.getElementById('show-routes')!.addEventListener('click', () => showScreen('routes'));
   document.getElementById('show-home')!.addEventListener('click', () => showScreen('home'));
 
-  const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const logoVideo = document.getElementById('hero-logo-video') as HTMLVideoElement;
-  const syncLogoMotion = () => {
-    if (logoMotionPreference.matches) {
-      logoVideo.pause();
-      logoVideo.removeAttribute('src');
-      logoVideo.load();
-    } else if (!logoVideo.hasAttribute('src')) {
-      logoVideo.src = './og-video.mp4';
-      logoVideo.load();
-      void logoVideo.play().catch(() => {});
-    }
-  };
-  syncLogoMotion();
-  logoMotionPreference.addEventListener('change', syncLogoMotion);
+  homeVideo = document.getElementById('hero-logo-video') as HTMLVideoElement | null;
 
   const grid = document.getElementById('grid')!;
-  for (const t of gpxTracks) {
+  if (viewableTracks.length === 0) {
+    grid.innerHTML = '<p class="routes-empty">Пока нет доступных маршрутов.</p>';
+  }
+  for (const t of viewableTracks) {
     const card = document.createElement('div');
     card.className = 'track-card';
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', `${t.name}, ${t.distanceKm} километра, набор высоты ${t.ascentM} метров`);
+    const trackName = escapeHtml(t.name);
+    const trackId = escapeHtml(t.id);
     card.innerHTML = `
       <div class="track-art">
-        <canvas class="canvas-thumb" data-id="${t.id}" aria-hidden="true"></canvas>
+        <canvas class="canvas-thumb" data-id="${trackId}" aria-hidden="true"></canvas>
         <span class="track-open">${uiIcon('northeast')}</span>
       </div>
       <div class="track-card-content">
-        <div class="track-title-row"><h3>${t.name}</h3></div>
+        <div class="track-title-row"><h3>${trackName}</h3></div>
         <div class="track-distance"><strong>${t.distanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}</strong><span>км</span></div>
         <div class="track-card-bottom"><span class="distance-label">ПРОТЯЖЁННОСТЬ МАРШРУТА</span><span class="track-ascent">${uiIcon('northeast')} ${t.ascentM} м <i>набор высоты</i></span></div>
       </div>`;
@@ -198,9 +269,10 @@ function renderGallery(tracks: Track[]) {
 }
 
 async function drawThumbnail(t: Track) {
-  const canvas = document.querySelector(`canvas[data-id="${t.id}"]`) as HTMLCanvasElement;
+  const canvas = Array.from(document.querySelectorAll<HTMLCanvasElement>('.canvas-thumb'))
+    .find((item) => item.dataset.id === t.id);
   if (!canvas) return;
-  const res = await fetch(`./tracks/${t.file}`);
+  const res = await fetch(`./tracks/${encodeURIComponent(t.file)}`);
   if (!res.ok) throw new Error(`Не удалось загрузить маршрут ${t.file}: HTTP ${res.status}`);
   const text = await res.text();
   const coords = await parseCoords(t.file, text);
@@ -237,13 +309,16 @@ async function drawThumbnail(t: Track) {
 }
 function showViewer(t: Track) {
   const requestId = ++viewerRequestId;
+  homeVideo = null;
+  const trackName = escapeHtml(t.name);
+  const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
   app.innerHTML = `
     <div class="map-view">
       <header class="map-toolbar">
         <button id="back" class="map-back" type="button">${uiIcon('left')} К трассам</button>
-        <div class="map-track-heading"><h1>${t.name}</h1></div>
+        <div class="map-track-heading"><h1>${trackName}</h1></div>
         <div class="map-track-distance"><strong>${t.distanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}</strong><span>КМ</span></div>
-        <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} GPX</button></div>
+        <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} ${fileFormat}</button></div>
       </header>
       <div id="map" class="track-map"></div>
       <section class="profile-panel" aria-label="Профиль высот маршрута">
@@ -267,18 +342,15 @@ async function returnToGallery() {
   profileAttempted = false;
   elevations = [];
   dists = [];
-  if (flyRafId !== null) cancelAnimationFrame(flyRafId);
-  flyRafId = null;
-  isFlying = false;
-  if (flyMarker) { flyMarker.remove(); flyMarker = null; }
-  const map = (window as any).__map as maplibregl.Map | undefined;
-  if (map) {
-    map.remove();
-    delete (window as any).__map;
+  destroyMap();
+
+  try {
+    const tracks = currentTracks.length ? currentTracks : await loadTracks();
+    renderGallery(tracks);
+    showScreen('routes');
+  } catch (error) {
+    showLoadError(error);
   }
-  const tracks = await loadTracks();
-  renderGallery(tracks);
-  showScreen('routes');
 }
 
 async function initViewer(t: Track, requestId: number) {
@@ -303,10 +375,9 @@ async function initViewer(t: Track, requestId: number) {
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const pad = 0.05;
-  const map = new (maplibregl.Map as any)({
+  const map = new maplibregl.Map({
     container: 'map',
-    maxParallelRequests: 4,
-    maxTileCache: 512,
+    maxTileCacheSize: 512,
     style: {
       version: 8,
       sources: {
@@ -325,27 +396,29 @@ async function initViewer(t: Track, requestId: number) {
     maxBounds: [[minLng - pad, minLat - pad], [maxLng + pad, maxLat + pad]]
   });
   (window as any).__map = map;
-  map.on('load', () => {
-  });
   map.on('idle', () => {
     if (!profileAttempted) {
       profileAttempted = true;
       void drawProfile(coords, requestId).catch(error => console.error('Profile drawing error:', error));
     }
   });
-  document.getElementById('cruise')!.addEventListener('click', () => {
+  const cruiseButton = document.getElementById('cruise') as HTMLButtonElement;
+  const setCruiseState = (active: boolean) => {
+    cruiseButton.innerHTML = active ? `${uiIcon('close')} Стоп` : `${uiIcon('play')} Круиз`;
+  };
+  cruiseButton.addEventListener('click', () => {
     if (!isFlying) {
       isFlying = true;
       if (currentIdx >= coords.length - 1) { currentIdx = 0; flyProgress = 0; }
       else { flyProgress = currentIdx; }
       flyStepSize = CRUISE_STEP;
       if (!flyMarker) flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
-      document.getElementById('cruise')!.textContent = 'Стоп';
+      setCruiseState(true);
       flyRafId = requestAnimationFrame(() => flyStep(map, coords));
     } else {
       isFlying = false;
       if (flyRafId) cancelAnimationFrame(flyRafId); flyRafId = null;
-      document.getElementById('cruise')!.textContent = 'Круиз';
+      setCruiseState(false);
     }
   });
   document.getElementById('download')!.addEventListener('click', () => openDownloadPopup(t));
@@ -373,6 +446,7 @@ async function initViewer(t: Track, requestId: number) {
       }, 2000);
       const profileCanvas = document.getElementById('profile') as HTMLCanvasElement;
       profileCanvas.addEventListener('click', (e) => {
+        if (!dists.length) return;
         const rect = profileCanvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const w = profileCanvas.clientWidth || 1;
@@ -391,7 +465,7 @@ async function initViewer(t: Track, requestId: number) {
           else { el.style.display = ''; }
           flyMarker.setLngLat(coords[best] as [number, number]);
         }
-        else flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo((window as any).__map);
+        else flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo(map);
         redrawProfile();
       });
 
@@ -549,7 +623,7 @@ async function drawProfile(coords: number[][], requestId = viewerRequestId) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     elevations = nextElevations;
-    dists = coords.map((_, i) => (i === 0 ? 0 : length(lineString(coords.slice(0, i + 1)), { units: 'kilometers' })));
+    dists = cumulativeDistancesKm(coords);
     canvas.width = canvas.clientWidth * devicePixelRatio;
     canvas.height = canvas.clientHeight * devicePixelRatio;
     ctx.scale(devicePixelRatio, devicePixelRatio);
@@ -578,6 +652,7 @@ async function drawProfile(coords: number[][], requestId = viewerRequestId) {
 }
 
 function redrawProfile() {
+  if (!elevations.length || !dists.length) return;
   const canvas = document.getElementById('profile') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -683,13 +758,14 @@ function flyStep(map: maplibregl.Map, coords: number[][]) {
 
 function downloadTrack(file: string) {
   const a = document.createElement('a');
-  a.href = `./tracks/${file}`;
+  a.href = `./tracks/${encodeURIComponent(file)}`;
   a.download = file;
   a.click();
 }
 
 function openDownloadPopup(t: Track) {
   const downloadUrl = new URL(`./tracks/${encodeURIComponent(t.file)}`, location.href).href;
+  const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
   closeActiveDownloadPopup?.();
   const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
@@ -703,9 +779,9 @@ function openDownloadPopup(t: Track) {
       </button>
       <span class="download-popup-eyebrow">ФАЙЛ МАРШРУТА</span>
       <h2 id="download-popup-title" class="download-popup-title">Загрузить трек</h2>
-      <p class="download-popup-track">${t.name}</p>
+      <p class="download-popup-track">${escapeHtml(t.name)}</p>
       <div class="download-popup-qr-frame">
-        <canvas id="download-qr" width="200" height="200" class="download-popup-qr" aria-label="QR-код для загрузки GPX-маршрута"></canvas>
+        <canvas id="download-qr" width="200" height="200" class="download-popup-qr" aria-label="QR-код для загрузки ${fileFormat}-маршрута"></canvas>
       </div>
       <button id="download-popup-btn" class="download-popup-button" type="button">
         ${uiIcon('down')}
@@ -769,23 +845,33 @@ function openDownloadPopup(t: Track) {
 
 
 async function parseCoords(file: string, text: string): Promise<number[][]> {
-
   const { kml, gpx } = await import('@tmcw/togeojson');
   const doc = new DOMParser().parseFromString(text, 'text/xml');
-  const gj = file.endsWith('.gpx') ? gpx(doc) : kml(doc);
+  const gj = /\.gpx$/i.test(file) ? gpx(doc) : kml(doc);
   for (const f of (gj as any).features || []) {
-    if (f.geometry && f.geometry.type === 'LineString') return f.geometry.coordinates.map((c: number[]) => [c[0], c[1], c[2] ?? 0]);
+    const coords = lineCoordinates(f.geometry);
+    if (coords.length >= 2) return coords.map((c) => [c[0], c[1], c[2] ?? 0]);
   }
   return [];
 }
 
 async function init() {
   closeActiveDownloadPopup?.();
-  if (flyMarker) { flyMarker.remove(); flyMarker = null; }
-  currentIdx = 0; flyProgress = 0; isFlying = false;
-  const tracks = await loadTracks();
-  renderGallery(tracks);
+  destroyMap();
+  profileRequestId++;
+  profileLoading = false;
+  profileAttempted = false;
+  elevations = [];
+  dists = [];
+  currentIdx = 0; flyProgress = 0;
+  try {
+    const tracks = await loadTracks();
+    renderGallery(tracks);
+    showScreen('home');
+  } catch (error) {
+    showLoadError(error);
+  }
 }
 
-init();
+void init();
 

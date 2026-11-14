@@ -597,6 +597,29 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   .download-popup-qr-frame { width: 176px; height: 176px; }
   .download-popup-qr { width: 160px; height: 160px; }
 }
+/* Экран ошибки загрузки данных и пустое состояние галереи */
+.app-error {
+  --forest-deep: #0a1713;
+  --lime: #c7f657;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(199, 246, 87, .12), transparent 45%),
+    var(--forest-deep);
+  color: #f3f1e8;
+  font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
+}
+.app-error-panel { max-width: 440px; text-align: center; }
+.app-error-eyebrow { color: var(--lime); font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+.app-error h1 { margin: 18px 0 12px; font-size: clamp(28px, 7vw, 44px); font-weight: 900; letter-spacing: -.05em; line-height: .95; }
+.app-error p { margin: 0 0 24px; color: rgba(243, 241, 232, .65); font-size: 14px; line-height: 1.6; }
+.app-error .primary-cta { margin-top: 0; }
+.app-error .primary-cta:disabled { cursor: wait; opacity: .65; }
+.routes-empty { grid-column: 1 / -1; margin: 0; padding: 32px 0; color: #778075; text-align: center; }
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
