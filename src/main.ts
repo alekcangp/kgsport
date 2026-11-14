@@ -200,6 +200,8 @@ function destroyMap() {
 }
 
 function showLoadError(error: unknown) {
+  document.body.classList.remove('map-open');
+  window.scrollTo({ top: 0, behavior: 'instant' });
   console.error('Track loading error:', error);
   closeActiveDownloadPopup?.();
   homeVideo = null;
@@ -406,6 +408,8 @@ async function drawThumbnail(t: Track) {
 function showViewer(t: Track) {
   const requestId = ++viewerRequestId;
   homeVideo = null;
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  document.body.classList.add('map-open');
   const trackName = escapeHtml(t.name);
   const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
   app.innerHTML = `
@@ -436,6 +440,8 @@ function showViewer(t: Track) {
 }
 
 async function returnToGallery() {
+  document.body.classList.remove('map-open');
+  window.scrollTo({ top: 0, behavior: 'instant' });
   viewerRequestId++;
   profileRequestId++;
   profileLoading = false;

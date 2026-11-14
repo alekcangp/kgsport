@@ -1,6 +1,7 @@
 ﻿html, body, #app { height: 100%; margin: 0; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior: none; }
 #app { min-height: 100vh; }
 .ui-icon { display: block; width: 1em; height: 1em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; pointer-events: none; }
 #map { width: 100%; height: calc(100vh - 280px); min-height: 280px; }
@@ -14,10 +15,13 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   --map-lime: #c7f657;
   --map-paper: #f3f1e8;
   display: flex;
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  min-height: 520px;
+  min-height: 0;
   flex-direction: column;
   overflow: hidden;
   background: var(--map-deep);
@@ -340,7 +344,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
 .hero-stat strong i { font-size: 14px; font-style: normal; }
 .hero-stat > span { max-width: 80px; color: rgba(241, 245, 235, .55); font-size: 8px; font-weight: 800; letter-spacing: .12em; line-height: 1.35; }
 .routes-screen { min-height: 100vh; background: var(--paper); color: var(--forest-deep); }
-.routes-header { display: flex; height: 68px; align-items: center; justify-content: space-between; padding: 0 clamp(22px, 7vw, 112px); border-bottom: 1px solid #dedfd5; }
+.routes-header { position: sticky; top: 0; z-index: 10; box-sizing: border-box; display: flex; height: calc(68px + env(safe-area-inset-top, 0px)); align-items: center; justify-content: space-between; padding: env(safe-area-inset-top, 0px) max(clamp(22px, 7vw, 112px), env(safe-area-inset-right, 0px)) 0 max(clamp(22px, 7vw, 112px), env(safe-area-inset-left, 0px)); border-bottom: 1px solid #dedfd5; background: var(--paper); }
 .back-home { display: inline-flex; align-items: center; gap: 9px; padding: 9px 0; border: 0; background: transparent; color: #455449; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
 .back-home > .ui-icon { color: #739d32; font-size: 17px; }
 .routes-brand { color: #526052; font-size: 9px; font-weight: 900; letter-spacing: .14em; }
@@ -451,7 +455,7 @@ body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; 
   .qr-copy strong { font-size: 10px; }
   .qr-copy { gap: 4px; }
   .qr-overline { font-size: 7px; }
-  .routes-header { height: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+  .routes-header { height: calc(60px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .routes-section { padding: 44px 21px 23px; }
   .section-heading { display: block; margin-bottom: 24px; }
   .section-heading h2 { font-size: clamp(32px, 9vw, 44px); }
