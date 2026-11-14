@@ -440,6 +440,7 @@ function showViewer(t: Track) {
 }
 
 async function returnToGallery() {
+  closeActiveDownloadPopup?.();
   document.body.classList.remove('map-open');
   window.scrollTo({ top: 0, behavior: 'instant' });
   viewerRequestId++;
@@ -1109,13 +1110,16 @@ function redrawProfile() {
 
 function downloadTrack(file: string) {
   const a = document.createElement('a');
-  a.href = `./tracks/${encodeURIComponent(file)}`;
+  a.href = new URL(`./tracks/${encodeURIComponent(file)}`, document.baseURI).href;
   a.download = file;
+  a.hidden = true;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
 }
 
 function openDownloadPopup(t: Track) {
-  const downloadUrl = new URL(`./tracks/${encodeURIComponent(t.file)}`, location.href).href;
+  const downloadUrl = new URL(`./tracks/${encodeURIComponent(t.file)}`, document.baseURI).href;
   const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
   closeActiveDownloadPopup?.();
   const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
