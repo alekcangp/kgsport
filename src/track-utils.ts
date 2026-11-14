@@ -105,3 +105,33 @@ export function positionAtDistance(
     lat: a[1] + (b[1] - a[1]) * fraction,
   };
 }
+
+/** Значение (например, высота) на маршруте по пройденной дистанции в километрах. */
+export function valueAtDistance(
+  dists: number[],
+  values: number[],
+  distanceKm: number,
+): number | null {
+  if (dists.length !== values.length || values.length === 0) return null;
+
+  const total = dists[dists.length - 1];
+  if (!Number.isFinite(total) || total <= 0) return values[0];
+
+  if (distanceKm <= 0) return values[0];
+  if (distanceKm >= total) return values[values.length - 1];
+
+  let low = 0;
+  let high = dists.length - 1;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (dists[mid] < distanceKm) low = mid + 1;
+    else high = mid;
+  }
+
+  const index = Math.max(0, low - 1);
+  const next = Math.min(index + 1, values.length - 1);
+  const segment = dists[next] - dists[index];
+  const fraction = segment > 0 ? (distanceKm - dists[index]) / segment : 0;
+
+  return values[index] + (values[next] - values[index]) * fraction;
+}

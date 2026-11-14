@@ -4,7 +4,8 @@ import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import QRCode from 'qrcode';
 import type { Track } from './types';
 import { length, lineString } from '@turf/turf';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, valueAtDistance } from './track-utils';
+import { imageryTileUrls, terrainTileUrls, warmTileCache } from './tile-cache';
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
@@ -30,6 +31,8 @@ let profileAttempted = false;
 let viewerRequestId = 0;
 let closeActiveDownloadPopup: (() => void) | null = null;
 let homeVideo: HTMLVideoElement | null = null;
+let profileDistanceKm = 0;
+let profileBase: HTMLCanvasElement | null = null;
 const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 
@@ -38,7 +41,6 @@ const CRUISE_SPEED_KMH = 120;
 let cruiseDists: number[] = [];
 let cruiseDistanceKm = 0;
 let lastFrameTime: number | null = null;
-let lastProfileRedraw = 0;
 let flyRafId: number | null = null;
 
 const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
@@ -86,12 +88,90 @@ function syncLogoMotion() {
 
 logoMotionPreference.addEventListener('change', syncLogoMotion);
 
+let profileResizeFrame: number | null = null;
+window.addEventListener('resize', () => {
+  if (profileResizeFrame !== null) return;
+  profileResizeFrame = requestAnimationFrame(() => {
+    profileResizeFrame = null;
+    profileBase = null;
+    if (elevations.length && dists.length) redrawProfile();
+  });
+});
+
 async function loadTracks(): Promise<Track[]> {
   const res = await fetch('./tracks.json');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data: unknown = await res.json();
   if (!Array.isArray(data)) throw new Error('Некорректный формат tracks.json');
   return data as Track[];
+}
+
+const TILE_WARMUP_STORAGE_KEY = 'kgsport:tiles-warmed-at';
+const TILE_WARMUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let tileWarmupStarted = false;
+
+interface NetworkInformationLike {
+  saveData?: boolean;
+}
+
+function whenServiceWorkerControls(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return Promise.resolve();
+  if (navigator.serviceWorker.controller) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const timer = window.setTimeout(done, 10000);
+    navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+  });
+}
+
+function shouldWarmTiles(): boolean {
+  const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection;
+  if (connection?.saveData) return false;
+  try {
+    const last = Number(localStorage.getItem(TILE_WARMUP_STORAGE_KEY) || 0);
+    return !(Number.isFinite(last) && last > 0 && Date.now() - last < TILE_WARMUP_INTERVAL_MS);
+  } catch {
+    return true;
+  }
+}
+
+function runWhenIdle(task: () => void) {
+  const idle = (window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  }).requestIdleCallback;
+  if (idle) idle(task, { timeout: 5000 });
+  else window.setTimeout(task, 3000);
+}
+
+/** Один раз в сутки прогревает тайлы подложки вокруг всех трасс для офлайн-карт. */
+function scheduleTileWarmup(tracks: Track[]) {
+  if (import.meta.env.DEV || tileWarmupStarted) return;
+  if (!shouldWarmTiles()) return;
+  tileWarmupStarted = true;
+
+  const bboxes = tracks
+    .filter(t => isViewableTrackFile(t.file) && Array.isArray(t.bbox) && t.bbox.length === 4)
+    .map(t => t.bbox);
+  if (!bboxes.length) return;
+
+  void whenServiceWorkerControls().then(() => runWhenIdle(() => {
+    if (!shouldWarmTiles() || !navigator.serviceWorker?.controller) return;
+    const urls = bboxes.flatMap(bbox => [...imageryTileUrls(bbox), ...terrainTileUrls(bbox)]);
+    void warmTileCache(urls, 5).then((warmed) => {
+      if (!warmed) return;
+      try {
+        localStorage.setItem(TILE_WARMUP_STORAGE_KEY, String(Date.now()));
+      } catch {
+        // localStorage может быть недоступен — прогрев просто повторится позже.
+      }
+    });
+  }));
 }
 
 function destroyMap() {
@@ -352,6 +432,8 @@ async function returnToGallery() {
   profileAttempted = false;
   elevations = [];
   dists = [];
+  profileDistanceKm = 0;
+  profileBase = null;
   destroyMap();
 
   try {
@@ -369,6 +451,8 @@ async function initViewer(t: Track, requestId: number) {
   profileAttempted = false;
   elevations = [];
   dists = [];
+  profileDistanceKm = 0;
+  profileBase = null;
   if (flyMarker) { flyMarker.remove(); flyMarker = null; }
   currentIdx = 0; isFlying = false;
   const res = await fetch(`./tracks/${t.file}`);
@@ -394,7 +478,7 @@ async function initViewer(t: Track, requestId: number) {
       version: 8,
       sources: {
         esri: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256 },
-        terrain: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium' }
+        terrain: { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium', maxzoom: 15 }
       },
       layers: [{ id: 'esri-layer', type: 'raster', source: 'esri' }],
       terrain: { source: 'terrain', exaggeration: 1.5 }
@@ -424,8 +508,8 @@ async function initViewer(t: Track, requestId: number) {
       if (currentIdx >= coords.length - 1) currentIdx = 0;
       cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
       cruiseDistanceKm = cruiseDists[currentIdx] ?? 0;
+      profileDistanceKm = cruiseDistanceKm;
       lastFrameTime = null;
-      lastProfileRedraw = 0;
       if (!flyMarker) flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
       setCruiseState(true);
       flyRafId = requestAnimationFrame((timestamp) => flyStep(map, coords, timestamp));
@@ -472,6 +556,7 @@ async function initViewer(t: Track, requestId: number) {
           if (dd < bestDist) { bestDist = dd; best = idx; }
         });
         currentIdx = best;
+        profileDistanceKm = dists[best] ?? 0;
         if (isFlying) {
           cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
           cruiseDistanceKm = cruiseDists[best] ?? 0;
@@ -638,47 +723,32 @@ async function drawProfile(coords: number[][], requestId = viewerRequestId) {
     if (requestId !== viewerRequestId || profileId !== profileRequestId || document.getElementById('profile') !== canvas) return;
     if (!nextElevations.length) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
     elevations = nextElevations;
     dists = cumulativeDistancesKm(coords);
-    canvas.width = canvas.clientWidth * devicePixelRatio;
-    canvas.height = canvas.clientHeight * devicePixelRatio;
-    ctx.scale(devicePixelRatio, devicePixelRatio);
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    profileBase = null;
     // Если высоты неизвестны (все 0) — не закрашиваем трек серым
     if (!elevations.every(e => e === 0)) {
       renderTrackSlope(coords, elevations);
     }
-    const miny = Math.min(...elevations), maxy = Math.max(...elevations);
-    const range = maxy - miny || 1;
-    ctx.fillStyle = '#10251f';
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#c7f657';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    elevations.forEach((y, i) => {
-      const x = (i / (elevations.length - 1)) * w;
-      const yy = h - ((y - miny) / range) * (h - 30 ) - 14;
-      if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
-    });
-    ctx.stroke();
     redrawProfile();
   } finally {
     if (profileId === profileRequestId) profileLoading = false;
   }
 }
 
-function redrawProfile() {
-  if (!elevations.length || !dists.length) return;
-  const canvas = document.getElementById('profile') as HTMLCanvasElement;
-  const ctx = canvas.getContext('2d')!;
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.scale(devicePixelRatio, devicePixelRatio);
+function renderProfileBase(w: number, h: number): HTMLCanvasElement | null {
+  const scale = devicePixelRatio;
+  const base = document.createElement('canvas');
+  base.width = Math.max(1, Math.round(w * scale));
+  base.height = Math.max(1, Math.round(h * scale));
+  const ctx = base.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+
   const miny = Math.min(...elevations), maxy = Math.max(...elevations);
   const range = maxy - miny || 1;
+  const total = dists[dists.length - 1] ?? 0;
+
   ctx.fillStyle = '#10251f';
   ctx.fillRect(0, 0, w, h);
   // grid
@@ -700,7 +770,6 @@ function redrawProfile() {
   // axis X distance
   ctx.fillStyle = '#bdc7b8';
   ctx.font = '10px sans-serif';
-  const total = dists[dists.length - 1] ?? 0;
   const step = total > 5 ? 1 : total > 2 ? 0.5 : 0.1;
   for (let km = 0; km <= total + 1e-9; km += step) {
     const x = (km / (total || 1)) * w;
@@ -712,14 +781,7 @@ function redrawProfile() {
     ctx.fillText(km.toFixed(1), x + 2, h - 6);
   }
 
-  ctx.strokeStyle = '#c7f657';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  const hi = Math.min(currentIdx, elevations.length - 1);
-  const hx = (dists[hi] / (total || 1)) * w;
-  const hy = (elevations[hi] ?? 0);
-  const hyy = h - ((hy - miny) / range) * (h - 30 ) - 14;
-  // profile line
+  // profile line (по расстоянию, как и маркер)
   if (elevations.length > 1) {
     ctx.strokeStyle = '#c7f657';
     ctx.lineWidth = 2;
@@ -731,14 +793,49 @@ function redrawProfile() {
     });
     ctx.stroke();
   }
+
+  return base;
+}
+
+function redrawProfile() {
+  if (!elevations.length || !dists.length) return;
+  const canvas = document.getElementById('profile') as HTMLCanvasElement | null;
+  if (!canvas) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+
+  const scale = devicePixelRatio;
+  const pixelWidth = Math.max(1, Math.round(w * scale));
+  const pixelHeight = Math.max(1, Math.round(h * scale));
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
+    profileBase = null;
+  }
+
+  if (!profileBase) profileBase = renderProfileBase(w, h);
+
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (profileBase) ctx.drawImage(profileBase, 0, 0, w, h);
+
+  const miny = Math.min(...elevations), maxy = Math.max(...elevations);
+  const range = maxy - miny || 1;
+  const total = dists[dists.length - 1] ?? 0;
+  const km = Math.min(Math.max(profileDistanceKm, 0), total);
+  const height = valueAtDistance(dists, elevations, km) ?? elevations[0] ?? 0;
+  const hx = (km / (total || 1)) * w;
+  const hyy = h - ((height - miny) / range) * (h - 30 ) - 14;
+
   // current position marker
   ctx.fillStyle = '#f3f1e8';
   ctx.beginPath();
   ctx.arc(hx, hyy, 4, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#f3f1e8';
   ctx.font = '600 12px sans-serif';
-  const label = (elevations[hi] ?? 0).toFixed(1) + ' м · ' + (dists[hi] ?? 0).toFixed(2) + ' км';
+  const label = height.toFixed(1) + ' м · ' + km.toFixed(2) + ' км';
   const labelPadding = 6;
   const labelWidth = ctx.measureText(label).width + labelPadding * 2;
   const labelX = Math.min(Math.max(hx + 6, 4), Math.max(4, w - labelWidth - 4));
@@ -776,10 +873,8 @@ function flyStep(map: MapLibreMap, coords: number[][], timestamp: number) {
   }
   try { map.panTo([position.lng, position.lat], { animate: false, duration: 0 }); } catch {}
   currentIdx = i;
-  if (timestamp - lastProfileRedraw >= 100) {
-    lastProfileRedraw = timestamp;
-    redrawProfile();
-  }
+  profileDistanceKm = cruiseDistanceKm;
+  redrawProfile();
   if (isFlying) flyRafId = requestAnimationFrame((nextTimestamp) => flyStep(map, coords, nextTimestamp));
 }
 
@@ -890,11 +985,14 @@ async function init() {
   profileAttempted = false;
   elevations = [];
   dists = [];
+  profileDistanceKm = 0;
+  profileBase = null;
   currentIdx = 0;
   try {
     const tracks = await loadTracks();
     renderGallery(tracks);
     showScreen('home');
+    scheduleTileWarmup(tracks);
   } catch (error) {
     showLoadError(error);
   }

@@ -33,12 +33,12 @@ export default defineConfig({
           {
             urlPattern: /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/\d+\/\d+\/\d+(?:\/.*)?(?:\?.*)?$/i,
             handler: 'CacheFirst',
-            options: { cacheName: 'esri-imagery-tiles', expiration: { maxEntries: 256, maxAgeSeconds: 60 * 60 * 24 * 30 } }
+            options: { cacheName: 'esri-imagery-tiles', expiration: { maxEntries: 1000, maxAgeSeconds: 60 * 60 * 24 * 30 } }
           },
           {
             urlPattern: /^https:\/\/s3\.amazonaws\.com\/elevation-tiles-prod\/terrarium\/\d+\/\d+\/\d+\.png(?:\?.*)?$/i,
             handler: 'CacheFirst',
-            options: { cacheName: 'terrain-tiles', expiration: { maxEntries: 256, maxAgeSeconds: 60 * 60 * 24 * 30 } }
+            options: { cacheName: 'terrain-tiles', expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 } }
           }
         ]
       }

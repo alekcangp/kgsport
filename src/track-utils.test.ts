@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, valueAtDistance } from './track-utils';
 
 describe('escapeHtml', () => {
   it('экранирует HTML-спецсимволы', () => {
@@ -91,5 +91,35 @@ describe('positionAtDistance', () => {
   it('в конце и за пределами маршрута возвращает последнюю точку', () => {
     expect(positionAtDistance(dists, coords, 2)).toMatchObject({ index: 2, lng: 1, lat: 1 });
     expect(positionAtDistance(dists, coords, 99)).toMatchObject({ index: 2, lng: 1, lat: 1 });
+  });
+});
+
+describe('valueAtDistance', () => {
+  const dists = [0, 0.1, 0.25, 0.4];
+  const heights = [100, 120, 90, 110];
+
+  it('возвращает null для некорректных данных', () => {
+    expect(valueAtDistance([], [], 0)).toBeNull();
+    expect(valueAtDistance([0, 1], [10], 0.5)).toBeNull();
+  });
+
+  it('линейно интерполирует внутри сегмента', () => {
+    expect(valueAtDistance(dists, heights, 0.05)).toBeCloseTo(110, 6);
+    expect(valueAtDistance(dists, heights, 0.175)).toBeCloseTo(105, 6);
+    expect(valueAtDistance(dists, heights, 0.325)).toBeCloseTo(100, 6);
+  });
+
+  it('точно возвращает значения в узлах', () => {
+    expect(valueAtDistance(dists, heights, 0.1)).toBe(120);
+    expect(valueAtDistance(dists, heights, 0.25)).toBe(90);
+  });
+
+  it('зажимает значения в границах маршрута', () => {
+    expect(valueAtDistance(dists, heights, -1)).toBe(100);
+    expect(valueAtDistance(dists, heights, 99)).toBe(110);
+  });
+
+  it('для маршрута нулевой длины возвращает первое значение', () => {
+    expect(valueAtDistance([0, 0], [50, 60], 0)).toBe(50);
   });
 });
