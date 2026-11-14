@@ -59,3 +59,49 @@ export function cumulativeDistancesKm(coords: number[][]): number[] {
   }
   return result;
 }
+
+export interface TrackPosition {
+  index: number;
+  fraction: number;
+  lng: number;
+  lat: number;
+}
+
+/** Позиция на маршруте по пройденной дистанции в километрах. */
+export function positionAtDistance(
+  dists: number[],
+  coords: number[][],
+  distanceKm: number,
+): TrackPosition | null {
+  if (dists.length !== coords.length || coords.length === 0) return null;
+
+  const total = dists[dists.length - 1];
+  if (!Number.isFinite(total) || total <= 0) return null;
+
+  if (distanceKm >= total) {
+    const last = coords.length - 1;
+    return { index: last, fraction: 0, lng: coords[last][0], lat: coords[last][1] };
+  }
+
+  let low = 0;
+  let high = dists.length - 1;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (dists[mid] < distanceKm) low = mid + 1;
+    else high = mid;
+  }
+
+  const index = Math.max(0, low - 1);
+  const next = Math.min(index + 1, coords.length - 1);
+  const segment = dists[next] - dists[index];
+  const fraction = segment > 0 ? (distanceKm - dists[index]) / segment : 0;
+  const a = coords[index];
+  const b = coords[next];
+
+  return {
+    index,
+    fraction,
+    lng: a[0] + (b[0] - a[0]) * fraction,
+    lat: a[1] + (b[1] - a[1]) * fraction,
+  };
+}

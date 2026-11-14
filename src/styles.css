@@ -1,15 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 html, body, #app { height: 100%; margin: 0; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
 #app { min-height: 100vh; }
 .ui-icon { display: block; width: 1em; height: 1em; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; pointer-events: none; }
-.card { @apply bg-slate-800 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition; }
-.btn { @apply px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium; }
-.btn-ghost { @apply px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm; }
 #map { width: 100%; height: calc(100vh - 280px); min-height: 280px; }
 .canvas-thumb { width: 100%; height: 100%; display: block; }
 .profile-canvas { width: 100%; height: 124px; display: block; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance } from './track-utils';
 
 describe('escapeHtml', () => {
   it('экранирует HTML-спецсимволы', () => {
@@ -66,5 +66,30 @@ describe('cumulativeDistancesKm', () => {
 
   it('для одной точки возвращает один ноль', () => {
     expect(cumulativeDistancesKm([[73.2166, 55.3637]])).toEqual([0]);
+  });
+});
+
+describe('positionAtDistance', () => {
+  const coords = [[0, 0], [1, 0], [1, 1]];
+  const dists = [0, 1, 2];
+
+  it('возвращает null для некорректных данных', () => {
+    expect(positionAtDistance([], [], 0)).toBeNull();
+    expect(positionAtDistance([0, 1], coords, 0.5)).toBeNull();
+    expect(positionAtDistance([0, 0], [[0, 0], [1, 1]], 0)).toBeNull();
+  });
+
+  it('в начале маршрута возвращает первую точку', () => {
+    expect(positionAtDistance(dists, coords, 0)).toMatchObject({ index: 0, lng: 0, lat: 0 });
+  });
+
+  it('интерполирует позицию внутри сегмента', () => {
+    expect(positionAtDistance(dists, coords, 0.5)).toMatchObject({ index: 0, fraction: 0.5, lng: 0.5, lat: 0 });
+    expect(positionAtDistance(dists, coords, 1.5)).toMatchObject({ index: 1, fraction: 0.5, lng: 1, lat: 0.5 });
+  });
+
+  it('в конце и за пределами маршрута возвращает последнюю точку', () => {
+    expect(positionAtDistance(dists, coords, 2)).toMatchObject({ index: 2, lng: 1, lat: 1 });
+    expect(positionAtDistance(dists, coords, 99)).toMatchObject({ index: 2, lng: 1, lat: 1 });
   });
 });

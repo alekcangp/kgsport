@@ -1,18 +1,26 @@
 import './styles.css';
-import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-maplibregl.setWorkerUrl('./maplibre-gl-worker.mjs');
+import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import QRCode from 'qrcode';
 import type { Track } from './types';
 import { length, lineString } from '@turf/turf';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance } from './track-utils';
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
+let maplibrePromise: Promise<typeof import('maplibre-gl')> | null = null;
+function loadMaplibre() {
+  maplibrePromise ??= import('maplibre-gl').then((module) => {
+    module.setWorkerUrl('./maplibre-gl-worker.mjs');
+    return module;
+  });
+  return maplibrePromise;
+}
+
 const app = document.getElementById('app')!;
 
-let flyMarker: maplibregl.Marker | null = null;
+let flyMarker: Marker | null = null;
 let elevations: number[] = [];
 let currentIdx = 0;
 let dists: number[] = [];
@@ -26,9 +34,11 @@ const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)
 
 
 let isFlying = false;
-let flyProgress = 0;
-const CRUISE_STEP = 0.15;
-let flyStepSize = CRUISE_STEP;
+const CRUISE_SPEED_KMH = 120;
+let cruiseDists: number[] = [];
+let cruiseDistanceKm = 0;
+let lastFrameTime: number | null = null;
+let lastProfileRedraw = 0;
 let flyRafId: number | null = null;
 
 const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
@@ -92,7 +102,7 @@ function destroyMap() {
     flyMarker.remove();
     flyMarker = null;
   }
-  const map = (window as any).__map as maplibregl.Map | undefined;
+  const map = (window as any).__map as MapLibreMap | undefined;
   if (map) {
     try {
       map.remove();
@@ -360,7 +370,7 @@ async function initViewer(t: Track, requestId: number) {
   elevations = [];
   dists = [];
   if (flyMarker) { flyMarker.remove(); flyMarker = null; }
-  currentIdx = 0; flyProgress = 0; isFlying = false;
+  currentIdx = 0; isFlying = false;
   const res = await fetch(`./tracks/${t.file}`);
   if (requestId !== viewerRequestId) return;
   if (!res.ok) throw new Error(`Не удалось загрузить маршрут ${t.file}: HTTP ${res.status}`);
@@ -369,13 +379,15 @@ async function initViewer(t: Track, requestId: number) {
   const coords = await parseCoords(t.file, text);
   if (requestId !== viewerRequestId) return;
   if (coords.length < 2) throw new Error(`В маршруте ${t.file} недостаточно точек`);
+  const maplibre = await loadMaplibre();
+  if (requestId !== viewerRequestId) return;
 
   // no token needed for Esri imagery
   const lngs = coords.map(c => c[0]), lats = coords.map(c => c[1]);
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const pad = 0.05;
-  const map = new maplibregl.Map({
+  const map = new maplibre.Map({
     container: 'map',
     maxTileCacheSize: 512,
     style: {
@@ -409,12 +421,14 @@ async function initViewer(t: Track, requestId: number) {
   cruiseButton.addEventListener('click', () => {
     if (!isFlying) {
       isFlying = true;
-      if (currentIdx >= coords.length - 1) { currentIdx = 0; flyProgress = 0; }
-      else { flyProgress = currentIdx; }
-      flyStepSize = CRUISE_STEP;
-      if (!flyMarker) flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
+      if (currentIdx >= coords.length - 1) currentIdx = 0;
+      cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
+      cruiseDistanceKm = cruiseDists[currentIdx] ?? 0;
+      lastFrameTime = null;
+      lastProfileRedraw = 0;
+      if (!flyMarker) flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[currentIdx] as [number, number]).addTo(map);
       setCruiseState(true);
-      flyRafId = requestAnimationFrame(() => flyStep(map, coords));
+      flyRafId = requestAnimationFrame((timestamp) => flyStep(map, coords, timestamp));
     } else {
       isFlying = false;
       if (flyRafId) cancelAnimationFrame(flyRafId); flyRafId = null;
@@ -427,12 +441,12 @@ async function initViewer(t: Track, requestId: number) {
       const startEl = document.createElement('div');
       startEl.className = 'track-marker start';
       startEl.textContent = 'С';
-      new maplibregl.Marker({ element: startEl, anchor: 'bottom' }).setLngLat(coords[0] as [number, number]).addTo(map);
+      new maplibre.Marker({ element: startEl, anchor: 'bottom' }).setLngLat(coords[0] as [number, number]).addTo(map);
       const finishEl = document.createElement('div');
       finishEl.className = 'track-marker finish';
       finishEl.textContent = 'Ф';
-      new maplibregl.Marker({ element: finishEl, anchor: 'bottom' }).setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
-      flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[0] as [number, number]).addTo(map);
+      new maplibre.Marker({ element: finishEl, anchor: 'bottom' }).setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
+      flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[0] as [number, number]).addTo(map);
       {
         const el = flyMarker.getElement();
         if (el) el.style.display = 'none';
@@ -458,14 +472,18 @@ async function initViewer(t: Track, requestId: number) {
           if (dd < bestDist) { bestDist = dd; best = idx; }
         });
         currentIdx = best;
-        flyProgress = best;
+        if (isFlying) {
+          cruiseDists = dists.length === coords.length ? dists : cumulativeDistancesKm(coords);
+          cruiseDistanceKm = cruiseDists[best] ?? 0;
+          lastFrameTime = null;
+        }
         if (flyMarker) {
           const el = flyMarker.getElement();
           if (best === 0 || best === coords.length - 1) { el.style.display = 'none'; }
           else { el.style.display = ''; }
           flyMarker.setLngLat(coords[best] as [number, number]);
         }
-        else flyMarker = new maplibregl.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo(map);
+        else flyMarker = new maplibre.Marker({ color: '#f59e0b' }).setLngLat(coords[best] as [number, number]).addTo(map);
         redrawProfile();
       });
 
@@ -735,25 +753,34 @@ function redrawProfile() {
 }
 
 
-function flyStep(map: maplibregl.Map, coords: number[][]) {
+function flyStep(map: MapLibreMap, coords: number[][], timestamp: number) {
   if (!isFlying) return;
-  flyProgress += flyStepSize;
-  if (flyProgress >= coords.length - 1) { flyProgress = 0; }
-  const i = Math.floor(flyProgress);
-  const frac = flyProgress - i;
-  const a = coords[i], b = coords[Math.min(i + 1, coords.length - 1)];
-  const lng = a[0] + (b[0] - a[0]) * frac;
-  const lat = a[1] + (b[1] - a[1]) * frac;
+
+  const total = cruiseDists[cruiseDists.length - 1] ?? 0;
+  if (!(total > 0)) return;
+  if (lastFrameTime !== null) {
+    const deltaSeconds = Math.min((timestamp - lastFrameTime) / 1000, 0.1);
+    cruiseDistanceKm = (cruiseDistanceKm + (CRUISE_SPEED_KMH / 3600) * deltaSeconds) % total;
+  }
+  lastFrameTime = timestamp;
+
+  const position = positionAtDistance(cruiseDists, coords, cruiseDistanceKm);
+  if (!position) return;
+
+  const i = position.index;
   if (flyMarker) {
     const el = flyMarker.getElement();
     if (i === 0 || i === coords.length - 1) { el.style.display = 'none'; }
     else { el.style.display = ''; }
-    flyMarker.setLngLat([lng, lat]);
+    flyMarker.setLngLat([position.lng, position.lat]);
   }
-  try { map.panTo([lng, lat], { animate: false, duration: 0 }); } catch {}
+  try { map.panTo([position.lng, position.lat], { animate: false, duration: 0 }); } catch {}
   currentIdx = i;
-  redrawProfile();
-  if (isFlying) flyRafId = requestAnimationFrame(() => flyStep(map, coords));
+  if (timestamp - lastProfileRedraw >= 100) {
+    lastProfileRedraw = timestamp;
+    redrawProfile();
+  }
+  if (isFlying) flyRafId = requestAnimationFrame((nextTimestamp) => flyStep(map, coords, nextTimestamp));
 }
 
 function downloadTrack(file: string) {
@@ -863,7 +890,7 @@ async function init() {
   profileAttempted = false;
   elevations = [];
   dists = [];
-  currentIdx = 0; flyProgress = 0;
+  currentIdx = 0;
   try {
     const tracks = await loadTracks();
     renderGallery(tracks);
