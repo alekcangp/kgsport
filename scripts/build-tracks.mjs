@@ -35,12 +35,29 @@ function extractLine(gj) {
   return null;
 }
 
+// Порог шума высоты (м): подъёмы короче порога отбрасываются как погрешность GPS.
+// 0 = учитывать все подъёмы (буквальное определение набора высоты).
+const ELEVATION_NOISE_M = 0.5;
+
+/**
+ * Набор высоты (м) — сумма ВСЕХ подъёмов маршрута.
+ * Спуски и горизонтальные участки не учитываются, поэтому сумма подъёмов может
+ * превышать перепад высот (max − min), если трасса идёт вверх-вниз несколько раз.
+ * Подъёмы короче ELEVATION_NOISE_M отбрасываются как шум; при пороге 0 считаются все.
+ */
 function ascentM(coords) {
   let gain = 0;
+  let up = 0;
   for (let i = 1; i < coords.length; i++) {
     const d = (coords[i][2] ?? 0) - (coords[i - 1][2] ?? 0);
-    if (d > 0) gain += d;
+    if (d > 0) {
+      up += d;
+    } else if (d < 0) {
+      if (up >= ELEVATION_NOISE_M) gain += up;
+      up = 0;
+    }
   }
+  if (up >= ELEVATION_NOISE_M) gain += up;
   return Math.round(gain);
 }
 

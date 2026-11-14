@@ -74,20 +74,21 @@ export function terrainTileUrls(bounds: Bounds, padding = DEFAULT_PADDING): stri
   return tileUrlsForBounds(bounds, TERRAIN_ZOOMS, terrainTileUrl, padding);
 }
 
-interface NetworkInformationLike {
+export interface NetworkInformationLike {
   saveData?: boolean;
 }
 
 /**
  * Скачивает тайлы, чтобы service worker положил их в CacheFirst-кэш.
  * Ошибки игнорируются: прогрев не должен ломать приложение.
+ * maxTiles ограничивает разовый бюджет загрузки, чтобы прогрев не «съел» трафик.
  * Возвращает число успешно полученных ответов.
  */
-export async function warmTileCache(urls: readonly string[], concurrency = 4): Promise<number> {
+export async function warmTileCache(urls: readonly string[], concurrency = 4, maxTiles = 600): Promise<number> {
   const connection = (navigator as Navigator & { connection?: NetworkInformationLike }).connection;
   if (connection?.saveData) return 0;
 
-  const queue = [...new Set(urls)];
+  const queue = [...new Set(urls)].slice(0, Math.max(0, maxTiles));
   let warmed = 0;
 
   const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {

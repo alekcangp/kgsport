@@ -1,9 +1,22 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
-  build: { outDir: 'dist', sourcemap: true },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/maplibre-gl')) return 'maplibre-gl';
+          if (id.includes('node_modules/@turf')) return 'turf';
+          if (id.includes('node_modules/qrcode')) return 'qrcode';
+        },
+      },
+    },
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
@@ -61,4 +74,12 @@ export default defineConfig({
     })
   ],
   optimizeDeps: { exclude: ['maplibre-gl'] },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/track-utils.ts', 'src/tile-cache.ts'],
+    },
+  },
 });

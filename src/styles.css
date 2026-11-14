@@ -181,14 +181,15 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   --lime: #c7f657;
   --paper: #f3f1e8;
   min-height: 100dvh;
-  overflow: visible;
+  overflow-x: clip;
+  overflow-y: visible;
   background: var(--forest-deep);
   color: #f5f6f0;
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
 }
 .landing-page [hidden] { display: none !important; }
 .home-screen { position: relative; isolation: isolate; display: flex; min-height: 100dvh; flex-direction: column; background: radial-gradient(ellipse at 78% 34%, rgba(75, 132, 175, .25), transparent 42%), linear-gradient(180deg, #102536 0%, #152e42 52%, #1b3548 100%); }
-.home-screen::before, .home-screen::after { position: absolute; right: -5%; bottom: 0; left: -5%; content: ''; pointer-events: none; }
+.home-screen::before, .home-screen::after { position: absolute; right: 0; bottom: 0; left: 0; content: ''; pointer-events: none; }
 .home-screen::before { z-index: -1; height: 45%; background: linear-gradient(180deg, rgba(172, 207, 226, .72) 0 2%, #263f53 2.5% 100%); clip-path: polygon(0 63%, 10% 35%, 16% 49%, 28% 8%, 41% 59%, 52% 22%, 65% 61%, 77% 18%, 91% 55%, 100% 35%, 100% 100%, 0 100%); opacity: .64; }
 .home-screen::after { z-index: -1; height: 31%; background: linear-gradient(180deg, rgba(218, 235, 245, .8) 0 2%, #142b3d 2.5% 100%); clip-path: polygon(0 55%, 13% 28%, 24% 53%, 37% 10%, 50% 57%, 64% 22%, 79% 62%, 91% 25%, 100% 48%, 100% 100%, 0 100%); opacity: .88; }
 .site-header {
@@ -350,7 +351,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .hero-stat strong i { font-size: 14px; font-style: normal; }
 .hero-stat > span { max-width: 80px; color: rgba(241, 245, 235, .55); font-size: 8px; font-weight: 800; letter-spacing: .12em; line-height: 1.35; }
 .routes-screen { position: relative; isolation: isolate; min-height: 100dvh; color: #e2e8f0; background: radial-gradient(ellipse at 78% 34%, rgba(89, 133, 79, .2), transparent 42%), linear-gradient(180deg, #10251f 0%, #142922 52%, #1b3328 100%); }
-.routes-screen::before, .routes-screen::after { position: absolute; right: -5%; bottom: 0; left: -5%; content: ''; pointer-events: none; z-index: -1; }
+.routes-screen::before, .routes-screen::after { position: absolute; right: 0; bottom: 0; left: 0; content: ''; pointer-events: none; z-index: -1; }
 .routes-screen::before { height: 45%; background: linear-gradient(180deg, rgba(166, 190, 145, .56) 0 2%, #263d30 2.5% 100%); clip-path: polygon(0 63%, 10% 35%, 16% 49%, 28% 8%, 41% 59%, 52% 22%, 65% 61%, 77% 18%, 91% 55%, 100% 35%, 100% 100%, 0 100%); opacity: .64; }
 .routes-screen::after { height: 31%; background: linear-gradient(180deg, rgba(199, 246, 87, .2) 0 2%, #142922 2.5% 100%); clip-path: polygon(0 55%, 13% 28%, 24% 53%, 37% 10%, 50% 57%, 64% 22%, 79% 62%, 91% 25%, 100% 48%, 100% 100%, 0 100%); opacity: .88; }
 .routes-header { position: sticky; top: 0; z-index: 10; box-sizing: border-box; display: flex; height: 68px; align-items: center; justify-content: space-between; padding: 0 max(clamp(22px, 7vw, 112px), env(safe-area-inset-right, 0px)) 0 max(clamp(22px, 7vw, 112px), env(safe-area-inset-left, 0px)); border-bottom: 1px solid rgba(255, 255, 255, .12); background: #142922; }

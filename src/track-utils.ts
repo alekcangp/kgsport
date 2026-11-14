@@ -1,5 +1,3 @@
-import { length, lineString } from '@turf/turf';
-
 /** Экранирует строку для вставки в HTML-разметку или атрибут. */
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
@@ -50,12 +48,23 @@ function isPosition(value: unknown): value is number[] {
     && typeof value[1] === 'number';
 }
 
+const EARTH_RADIUS_KM = 6371.0088;
+
+/** Расстояние по большому кругу между точками [lon, lat] в километрах. */
+export function haversineKm(a: number[], b: number[]): number {
+  const lat1 = (a[1] * Math.PI) / 180;
+  const lat2 = (b[1] * Math.PI) / 180;
+  const dLat = lat2 - lat1;
+  const dLon = ((b[0] - a[0]) * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 /** Накопительные расстояния по точкам маршрута в километрах. */
 export function cumulativeDistancesKm(coords: number[][]): number[] {
   const result = [0];
   for (let i = 1; i < coords.length; i++) {
-    const segment = length(lineString([coords[i - 1], coords[i]]), { units: 'kilometers' });
-    result.push(result[i - 1] + segment);
+    result.push(result[i - 1] + haversineKm(coords[i - 1], coords[i]));
   }
   return result;
 }

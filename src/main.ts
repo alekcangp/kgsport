@@ -3,9 +3,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import QRCode from 'qrcode';
 import type { Track } from './types';
-import { length, lineString, nearestPointOnLine } from '@turf/turf';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, slopeAngleAtDistance, valueAtDistance } from './track-utils';
-import { imageryTileUrls, terrainTileUrls, warmTileCache } from './tile-cache';
+import { lineString, nearestPointOnLine } from '@turf/turf';
+import { cumulativeDistancesKm, escapeHtml, haversineKm, isViewableTrackFile, lineCoordinates, positionAtDistance, slopeAngleAtDistance, valueAtDistance } from './track-utils';
+import { imageryTileUrls, terrainTileUrls, warmTileCache, type NetworkInformationLike } from './tile-cache';
+import { SITE_URL } from './config';
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
@@ -22,6 +23,7 @@ function loadMaplibre() {
 const app = document.getElementById('app')!;
 
 let flyMarker: Marker | null = null;
+let currentMap: MapLibreMap | null = null;
 let elevations: number[] = [];
 let currentIdx = 0;
 let dists: number[] = [];
@@ -72,7 +74,6 @@ function isHomeScreenVisible(): boolean {
 
 function setThemeColor(color: string) {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', color);
-  document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', color);
   document.documentElement.style.backgroundColor = color;
   document.body.style.backgroundColor = color;
 }
@@ -131,10 +132,6 @@ async function loadTracks(): Promise<Track[]> {
 const TILE_WARMUP_STORAGE_KEY = 'kgsport:tiles-warmed-at';
 const TILE_WARMUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let tileWarmupStarted = false;
-
-interface NetworkInformationLike {
-  saveData?: boolean;
-}
 
 function whenServiceWorkerControls(): Promise<void> {
   if (!('serviceWorker' in navigator)) return Promise.resolve();
@@ -204,14 +201,14 @@ function destroyMap() {
     flyMarker.remove();
     flyMarker = null;
   }
-  const map = (window as any).__map as MapLibreMap | undefined;
+  const map = currentMap;
+  currentMap = null;
   if (map) {
     try {
       map.remove();
     } catch {
       // Карта уже могла быть удалена.
     }
-    delete (window as any).__map;
   }
 }
 
@@ -269,7 +266,6 @@ function renderGallery(tracks: Track[]) {
   const viewableTracks = tracks.filter(t => isViewableTrackFile(t.file));
   const maxDistanceKm = Math.max(0, ...viewableTracks.map(track => track.distanceKm));
   const maxAscentM = Math.max(0, ...viewableTracks.map(track => track.ascentM));
-  const siteUrl = 'https://alekcangp.github.io/kgsport/';
 
   app.innerHTML = `
     <div class="landing-page">
@@ -374,7 +370,7 @@ function renderGallery(tracks: Track[]) {
     });
     grid.appendChild(card);
   }
-  QRCode.toCanvas(document.getElementById('site-qr') as HTMLCanvasElement, siteUrl, {
+  QRCode.toCanvas(document.getElementById('site-qr') as HTMLCanvasElement, SITE_URL, {
     width: 144,
     margin: 1,
     color: { dark: '#10251f', light: '#ffffff' },
@@ -530,7 +526,7 @@ async function initViewer(t: Track, requestId: number) {
     bearing: 0,
     maxBounds: [[minLng - pad, minLat - pad], [maxLng + pad, maxLat + pad]]
   });
-  (window as any).__map = map;
+  currentMap = map;
   map.on('idle', () => {
     if (!profileAttempted) {
       profileAttempted = true;
@@ -592,7 +588,7 @@ async function initViewer(t: Track, requestId: number) {
 
     const target = Math.min(Math.max(km, 0), total);
     const from = profileDistanceKm;
-    if (Math.abs(target - from) < 1e-6) {
+    if (Math.abs(target - from) < 1e-6 || logoMotionPreference.matches) {
       applySeek(target);
       updateMarkerStats(true);
       return;
@@ -631,7 +627,7 @@ async function initViewer(t: Track, requestId: number) {
     }
     lastFrameTime = timestamp;
 
-    applySeek(cruiseDistanceKm);
+    applySeek(cruiseDistanceKm, { pan: !logoMotionPreference.matches });
     if (isFlying) flyRafId = requestAnimationFrame(flyStep);
   };
 
@@ -825,8 +821,8 @@ async function fetchElevations(coords: number[][]): Promise<number[]> {
   return out;
 }
 
-function renderTrackSlope(coords: number[][], elevations: number[]) {
-  const map = (window as any).__map;
+function renderTrackSlope(coords: number[][], elevations: number[], dists: number[]) {
+  const map = currentMap;
   if (!map) return;
 
   // Удаляем старый одноцветный слой, если остался
@@ -835,11 +831,10 @@ function renderTrackSlope(coords: number[][], elevations: number[]) {
 
   type SlopeType = 'ascent' | 'descent' | 'flat';
 
+  if (coords.length < 2 || dists.length !== coords.length) return;
+
   // Накопительные дистанции между точками GPX (в метрах)
-  const distsM: number[] = [0];
-  for (let i = 1; i < coords.length; i++) {
-    distsM.push(distsM[distsM.length - 1] + length(lineString([coords[i - 1], coords[i]]), { units: 'kilometers' }) * 1000);
-  }
+  const distsM = dists.map((km) => km * 1000);
   const totalM = distsM[distsM.length - 1];
   if (totalM <= 0) return;
 
@@ -856,7 +851,7 @@ function renderTrackSlope(coords: number[][], elevations: number[]) {
     sampleElevs.push(elevations[segIdx] + (nextElev - elevations[segIdx]) * t);
   }
 
-  // Сглаживаем высоты скользящим средним (окно 5 сэмплов), чтобы шум GPS не дрробил цвета
+  // Сглаживаем высоты скользящим средним (окно 5 сэмплов), чтобы шум GPS не дробил цвета
   const smoothElevs = [...sampleElevs];
   const win = 5;
   for (let i = 0; i < sampleElevs.length; i++) {
@@ -872,7 +867,7 @@ function renderTrackSlope(coords: number[][], elevations: number[]) {
   const angleRad = (SLOPE_ANGLE_DEG * Math.PI) / 180;
   for (let i = 0; i < sampleCoords.length - 1; i++) {
     const diff = smoothElevs[i + 1] - smoothElevs[i];
-    const distM = length(lineString([sampleCoords[i], sampleCoords[i + 1]]), { units: 'kilometers' }) * 1000;
+    const distM = haversineKm(sampleCoords[i], sampleCoords[i + 1]) * 1000;
     const angle = Math.atan2(diff, distM || 1);
     let type: SlopeType;
     if (angle > angleRad) type = 'ascent';
@@ -944,7 +939,7 @@ async function drawProfile(coords: number[][], requestId = viewerRequestId) {
     updateMarkerStats(true);
     // Если высоты неизвестны (все 0) — не закрашиваем трек серым
     if (!elevations.every(e => e === 0)) {
-      renderTrackSlope(coords, elevations);
+      renderTrackSlope(coords, elevations, dists);
     }
     redrawProfile();
   } finally {

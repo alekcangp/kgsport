@@ -7,7 +7,7 @@
 - Vite + TypeScript
 - MapLibre GL
 - Turf.js, @tmcw/togeojson
-- Tailwind CSS
+- Vanilla CSS (PostCSS + autoprefixer)
 
 ## Запуск
 
@@ -25,10 +25,13 @@ npm run build
 npm run preview
 ```
 
-## Тесты
+## Тесты и качество кода
 
 ```bash
-npm run test
+npm run test           # unit-тесты (Vitest)
+npm run test:coverage  # тесты + отчёт о покрытии
+npm run lint           # ESLint
+npm run format         # Prettier
 ```
 
 ## Структура
