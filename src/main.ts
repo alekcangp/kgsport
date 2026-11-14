@@ -72,6 +72,17 @@ function isHomeScreenVisible(): boolean {
 
 function setThemeColor(color: string) {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', color);
+  document.documentElement.style.backgroundColor = color;
+  document.body.style.backgroundColor = color;
+}
+
+function resetScrollPosition() {
+  const scrollingElement = document.scrollingElement;
+  if (scrollingElement) scrollingElement.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  document.getElementById('home-screen')?.scrollTo(0, 0);
+  document.getElementById('routes-screen')?.scrollTo(0, 0);
 }
 
 /** Загружает видео только когда главный экран видим и анимация не отключена. */
@@ -205,7 +216,7 @@ function destroyMap() {
 
 function showLoadError(error: unknown) {
   document.body.classList.remove('map-open');
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  resetScrollPosition();
   console.error('Track loading error:', error);
   closeActiveDownloadPopup?.();
   homeVideo = null;
@@ -234,7 +245,7 @@ function showScreen(screen: 'home' | 'routes') {
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
   setThemeColor(screen === 'home' ? '#102536' : '#f3f1e8');
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  resetScrollPosition();
   syncLogoMotion();
 
   if (screen === 'routes') {
@@ -414,7 +425,7 @@ function showViewer(t: Track) {
   const requestId = ++viewerRequestId;
   homeVideo = null;
   setThemeColor('#10251f');
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  resetScrollPosition();
   document.body.classList.add('map-open');
   const trackName = escapeHtml(t.name);
   const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
@@ -448,7 +459,7 @@ function showViewer(t: Track) {
 async function returnToGallery() {
   closeActiveDownloadPopup?.();
   document.body.classList.remove('map-open');
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  resetScrollPosition();
   viewerRequestId++;
   profileRequestId++;
   profileLoading = false;
