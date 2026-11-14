@@ -28,8 +28,13 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,svg,png,json,kml,gpx,mjs,webmanifest}'],
-        globIgnores: ['icons/**', 'manifest.webmanifest'],
+        globIgnores: ['icons/**', 'manifest.webmanifest', 'assets/maplibre-gl-*.js'],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/maplibre-gl-[^/]+\.js$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'maplibre-runtime', expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 30 } }
+          },
           {
             urlPattern: /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/\d+\/\d+\/\d+(?:\/.*)?(?:\?.*)?$/i,
             handler: 'CacheFirst',

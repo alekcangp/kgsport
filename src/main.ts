@@ -56,6 +56,9 @@ const UI_ICONS = {
   down: '<path d="M12 4v16m-7-7 7 7 7-7"/>',
   play: '<path d="m8 5 12 7-12 7z" fill="currentColor" stroke="none"/>',
   close: '<path d="m18 6-12 12M6 6l12 12"/>',
+  triangleRight: '<path d="M4 12l8-4-8-4z"/>',
+  triangleUp: '<path d="M12 4l-4 8h8z"/>',
+  triangleDown: '<path d="M12 20l4-8h-8z"/>',
 } as const;
 
 function uiIcon(name: keyof typeof UI_ICONS): string {
@@ -411,15 +414,15 @@ function showViewer(t: Track) {
         <button id="back" class="map-back" type="button">${uiIcon('left')} К трассам</button>
         <div class="map-track-heading"><h1>${trackName}</h1></div>
         <div class="map-track-stats" aria-label="Показатели текущей точки маршрута">
-          <div class="map-stat"><span>УГОЛ</span><strong id="stat-angle">—</strong></div>
+          <div class="map-stat"><span>УКЛОН</span><strong id="stat-angle">—</strong></div>
           <div class="map-stat"><span>ВЫСОТА</span><strong id="stat-elevation">—</strong></div>
-          <div class="map-stat"><span>ДИСТАНЦИЯ</span><strong id="stat-distance">—</strong></div>
+          <div class="map-stat"><span>РАССТОЯНИЕ</span><strong id="stat-distance">—</strong></div>
         </div>
         <div class="map-actions"><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} ${fileFormat}</button></div>
       </header>
       <div id="map" class="track-map"></div>
       <section class="profile-panel" aria-label="Профиль высот маршрута">
-        <div class="profile-heading"><strong>ПРОФИЛЬ ВЫСОТ</strong><span>Нажмите на график или трек на карте, чтобы выбрать точку</span></div>
+        <div class="profile-heading"><strong>ПРОФИЛЬ ВЫСОТ</strong><span>Нажмите на график или трек, чтобы выбрать точку</span></div>
         <canvas id="profile" class="profile-canvas" tabindex="0" aria-label="Профиль высот: стрелки меняют положение метки"></canvas>
       </section>
     </div>`;
@@ -1029,9 +1032,20 @@ function updateMarkerStats(force = false) {
     angleEl.textContent = '—';
     return;
   }
-  const rounded = Math.round(Math.abs(angle));
-  const arrow = Math.abs(angle) < 0.5 ? '→' : angle > 0 ? '↗' : '↘';
-  angleEl.textContent = `${arrow} ${rounded}°`;
+  const pct = Math.round(Math.tan(angle * Math.PI / 180) * 100);
+  let sign: string;
+  if (pct > 0) {
+    sign = '+';
+  } else if (pct < 0) {
+    sign = '-';
+  } else {
+    sign = '';
+  }
+  if (pct === 0) {
+    angleEl.innerHTML = '<span class="stat-angle-val">0%</span>';
+  } else {
+    angleEl.innerHTML = `<span class="slope-sign">${sign}</span><span class="stat-angle-val">${Math.abs(pct)}%</span>`;
+  }
 }
 
 function redrawProfile() {
