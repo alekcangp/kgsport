@@ -777,7 +777,7 @@ async function initViewer(t: Track, requestId: number) {
   });
 
   // --- Геолокация: кнопка «Я», маркер, расстояние до трассы и позиция на профиле ---
-  const ON_TRACK_KM = 0.03;
+  const ON_TRACK_KM = 0.01;
   const locateButton = document.getElementById('locate') as HTMLButtonElement;
   const geoStatus = document.getElementById('geo-status');
   let geoWatchId: number | null = null;
@@ -838,7 +838,7 @@ async function initViewer(t: Track, requestId: number) {
     const alongKm = snapped.properties.totalDistance ?? snapped.properties.location;
 
     if (Number.isFinite(offKm) && offKm <= ON_TRACK_KM && Number.isFinite(alongKm)) {
-      showGeoStatus(`На трассе · ${formatKm(alongKm)} км от старта`);
+      showGeoStatus('На трассе');
       applySeek(alongKm, { pan: false, marker: false });
     } else {
       const offM = Number.isFinite(offKm) ? Math.max(0, Math.round(offKm * 1000)) : null;
