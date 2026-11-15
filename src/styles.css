@@ -253,7 +253,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   padding: 54px clamp(32px, 7vw, 100px) 56px;
 }
 .hero-copy { position: relative; z-index: 2; min-width: 0; padding: 12px 0 24px; }
-.hero-eyebrow, .section-eyebrow, .qr-overline {
+.hero-eyebrow, .section-eyebrow {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -352,23 +352,26 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   position: relative;
   z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 13px;
-  width: min(260px, 100%);
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  width: min(300px, 100%);
   box-sizing: border-box;
   margin: 0 0 0 auto;
-  padding: 10px 28px 10px 10px;
+  padding: 12px 18px;
   border: 1px solid rgba(16, 37, 31, .1);
   border-radius: 4px;
   background: var(--paper);
   color: var(--forest-deep);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
 }
-.qr-frame { width: 76px; height: 76px; flex: 0 0 76px; display: grid; place-items: center; background: white; }
+.qr-item { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.qr-item + .qr-item { position: relative; }
+.qr-item + .qr-item::before { content: ''; position: absolute; top: 0; bottom: 0; left: -8px; width: 1px; background: rgba(16, 37, 31, .12); }
+.qr-frame { position: relative; width: 76px; height: 76px; flex: 0 0 76px; display: grid; place-items: center; background: white; }
 .qr-frame canvas { display: block; width: 68px !important; height: 68px !important; }
-.qr-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-.qr-overline { color: #536154; font-size: 8px; letter-spacing: .09em; }
-.qr-copy strong { font-size: 16px; font-weight: 900; letter-spacing: -.04em; line-height: 1.02; }
+.qr-badge { position: absolute; top: 50%; left: 50%; display: grid; width: 23px; height: 23px; place-items: center; transform: translate(-50%, -50%); border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgba(9, 26, 22, .3), inset 0 0 0 1px rgba(9, 26, 22, .07); pointer-events: none; }
+.qr-badge img { display: block; width: 18px; height: 18px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(9, 26, 22, .28)); }
 .hero-stat { position: absolute; bottom: 27px; display: flex; align-items: center; gap: 12px; }
 .hero-stat-one { left: clamp(22px, 10vw, 152px); }
 .hero-stat-two { right: clamp(22px, 10vw, 152px); }
@@ -485,12 +488,13 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .hero-logo-frame { width: min(64%, 250px); box-shadow: 0 0 0 4px rgba(243, 248, 250, .92), 0 16px 40px rgba(0, 0, 0, .4); }
   .art-label { gap: 6px; padding: 6px 9px; font-size: 7px; }
   .art-coordinate { font-size: 7px; }
-  .hero-qr-card { width: min(128px, 100%); align-self: end; gap: 5px; padding: 5px 15px 5px 5px; }
-  .qr-frame { width: 36px; height: 36px; flex-basis: 36px; }
-  .qr-frame canvas { width: 30px !important; height: 30px !important; }
-  .qr-copy strong { font-size: 10px; }
-  .qr-copy { gap: 4px; }
-  .qr-overline { font-size: 7px; }
+  .hero-qr-card { width: min(196px, 100%); align-self: end; gap: 10px; padding: 7px 11px; }
+  .qr-item { gap: 5px; }
+  .qr-item + .qr-item::before { left: -5px; }
+  .qr-frame { width: 44px; height: 44px; flex-basis: 44px; }
+  .qr-frame canvas { width: 38px !important; height: 38px !important; }
+  .qr-badge { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 1px 1px rgba(9, 26, 22, .26), inset 0 0 0 1px rgba(9, 26, 22, .07); }
+  .qr-badge img { width: 12px; height: 12px; filter: drop-shadow(0 .5px .5px rgba(9, 26, 22, .24)); }
   .routes-screen { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); }
   .routes-header { top: env(safe-area-inset-top, 0px); height: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .routes-section { padding: 44px 21px 23px; }

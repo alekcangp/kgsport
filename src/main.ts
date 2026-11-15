@@ -6,7 +6,7 @@ import type { Track } from './types';
 import { lineString, nearestPointOnLine } from '@turf/turf';
 import { cumulativeDistancesKm, escapeHtml, haversineKm, isViewableTrackFile, lineCoordinates, positionAtDistance, resolveElevations, slopeAngleAtDistance, trackFileUrl, valueAtDistance } from './track-utils';
 import { IMAGERY_TILES_TEMPLATE, imageryTileUrls, TERRAIN_TILES_TEMPLATE, terrainTileUrls, warmTileCache, type NetworkInformationLike } from './tile-cache';
-import { SITE_URL } from './config';
+import { ANDROID_URL, SITE_URL } from './config';
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
@@ -72,6 +72,39 @@ const UI_ICONS = {
 
 function uiIcon(name: keyof typeof UI_ICONS): string {
   return `<svg class="ui-icon ui-icon-${name}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${UI_ICONS[name]}</svg>`;
+}
+
+/**
+ * Значки в центре QR — готовые 3D-картинки: глобус из набора Microsoft Fluent
+ * Emoji (3D, лицензия MIT) и 3D-голова Android-робота с Викисклада (Google,
+ * CC BY 3.0). Лежат в public/, поэтому попадают и в dist, и в precache service
+ * worker, то есть работают в APK без сети.
+ */
+const QR_BADGE_ICONS = {
+  globe: 'qr-globe-3d.png',
+  android: 'qr-android-3d.svg',
+} as const;
+
+/**
+ * Значок в центре QR. Накладывается поверх канваса отдельным элементом: белая
+ * плашка закрывает часть модулей (уровень коррекции H это допускает), а картинка
+ * остаётся резкой на экране с любым DPI и не перерисовывается вместе с кодом.
+ */
+function qrBadge(name: keyof typeof QR_BADGE_ICONS): string {
+  return `<span class="qr-badge qr-badge-${name}" aria-hidden="true"><img src="./${QR_BADGE_ICONS[name]}" alt="" decoding="async" draggable="false"></span>`;
+}
+
+/** Рисует QR-код с высоким уровнем коррекции: центр перекрывает значок из разметки. */
+function renderQr(canvas: HTMLCanvasElement | null, url: string) {
+  if (!canvas) return;
+  QRCode.toCanvas(canvas, url, {
+    width: canvas.width,
+    margin: 1,
+    errorCorrectionLevel: 'H',
+    color: { dark: '#10251f', light: '#ffffff' },
+  }, (err) => {
+    if (err) console.error('QR code error:', err);
+  });
 }
 
 function isHomeScreenVisible(): boolean {
@@ -316,8 +349,12 @@ function renderGallery(tracks: Track[]) {
               <div class="hero-fact"><strong>${maxAscentM}<i> м</i></strong><span>НАБОР ВЫСОТЫ</span></div>
             </div>
             <div class="hero-qr-card">
-              <div class="qr-frame"><canvas id="site-qr" width="144" height="144" aria-label="QR-код сайта Крутая горка"></canvas></div>
-              <div class="qr-copy"><strong>Все трассы<br>на телефоне</strong><span class="qr-overline">Ссылка на сайт</span></div>
+              <div class="qr-item">
+                <div class="qr-frame"><canvas id="site-qr" width="144" height="144" aria-label="QR-код: веб-сайт Крутая горка"></canvas>${qrBadge('globe')}</div>
+              </div>
+              <div class="qr-item">
+                <div class="qr-frame"><canvas id="android-qr" width="144" height="144" aria-label="QR-код: APK-приложение для Android"></canvas>${qrBadge('android')}</div>
+              </div>
             </div>
           </div>
 
@@ -382,13 +419,8 @@ function renderGallery(tracks: Track[]) {
     });
     grid.appendChild(card);
   }
-  QRCode.toCanvas(document.getElementById('site-qr') as HTMLCanvasElement, SITE_URL, {
-    width: 144,
-    margin: 1,
-    color: { dark: '#10251f', light: '#ffffff' },
-  }, (err) => {
-    if (err) console.error('QR code error:', err);
-  });
+  renderQr(document.getElementById('site-qr') as HTMLCanvasElement, SITE_URL);
+  renderQr(document.getElementById('android-qr') as HTMLCanvasElement, ANDROID_URL);
 }
 
 async function drawThumbnail(t: Track) {
@@ -1443,7 +1475,8 @@ function downloadTrack(file: string) {
 }
 
 function openDownloadPopup(t: Track) {
-  const downloadUrl = new URL(trackFileUrl(t.file), document.baseURI).href;
+  // QR скачивания всегда ведёт на публичный сайт, а не на текущий origin (в APK это было бы localhost).
+  const downloadUrl = new URL(trackFileUrl(t.file), SITE_URL).href;
   const fileFormat = t.file.toLowerCase().endsWith('.kml') ? 'KML' : 'GPX';
   closeActiveDownloadPopup?.();
   const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
