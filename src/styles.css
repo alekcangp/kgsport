@@ -11,6 +11,9 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 #map { width: 100%; height: calc(100dvh - 280px); min-height: 280px; }
 .canvas-thumb { width: 100%; height: 100%; display: block; }
 .profile-canvas { width: 100%; height: 124px; display: block; }
+.profile-canvas[hidden] { display: none; }
+.profile-note { margin: 6px 0 2px; color: rgba(243, 241, 232, .62); font-size: 11px; font-weight: 600; }
+.map-status { position: absolute; z-index: 5; top: 12px; left: 12px; right: 12px; margin: 0; padding: 8px 12px; border: 1px solid rgba(199, 246, 87, .4); border-radius: 3px; background: rgba(10, 23, 19, .9); color: #f3f1e8; font-size: 11px; font-weight: 700; pointer-events: none; }
 
 /* Ski track map screen */
 .map-view {
@@ -65,6 +68,9 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 }
 .map-back > .ui-icon, .map-action > .ui-icon { color: var(--map-lime); font-size: 16px; }
 .map-back:hover, .map-action:hover { transform: translateY(-1px); border-color: var(--map-lime); background: rgba(243, 241, 232, .1); }
+.map-action:disabled { opacity: .5; cursor: default; }
+.map-action:disabled:hover { transform: none; border-color: rgba(243, 241, 232, .24); background: transparent; }
+.map-action-primary:disabled:hover { border-color: var(--map-lime); background: var(--map-lime); }
 .map-track-heading { min-width: 0; }
 .map-track-heading h1 { overflow: hidden; margin: 0; color: var(--map-paper); font-size: clamp(16px, 2vw, 21px); font-weight: 900; letter-spacing: -.045em; text-overflow: ellipsis; white-space: nowrap; }
 .map-track-stats { display: grid; grid-template-columns: minmax(5ch, 6ch) minmax(8ch, max-content) minmax(10ch, max-content); align-items: center; gap: clamp(6px, 1vw, 14px); color: var(--map-paper); }
@@ -80,6 +86,14 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .map-action-primary { border-color: var(--map-lime); background: var(--map-lime); color: var(--map-deep); }
 .map-action-primary > .ui-icon { color: var(--map-deep); }
 .map-action-primary:hover { border-color: #d5ff7a; background: #d5ff7a; color: var(--map-deep); }
+.map-action-icon { width: 38px; min-width: 38px; flex: 0 0 auto; padding: 0; }
+.map-action.is-active { border-color: var(--map-lime); background: var(--map-lime); color: var(--map-deep); }
+.map-action.is-active > .ui-icon { color: var(--map-deep); }
+.map-action.is-active:hover { border-color: #d5ff7a; background: #d5ff7a; color: var(--map-deep); }
+.geo-marker { position: relative; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; background: #2f7cf6; box-shadow: 0 0 0 3px rgba(47, 124, 246, .35), 0 2px 8px rgba(0, 0, 0, .45); }
+.geo-marker::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid rgba(47, 124, 246, .55); animation: geo-pulse 2s ease-out infinite; }
+@keyframes geo-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+.geo-status { position: absolute; z-index: 5; left: 12px; bottom: 12px; max-width: calc(100% - 24px); margin: 0; padding: 7px 11px; border: 1px solid rgba(199, 246, 87, .35); border-radius: 999px; background: rgba(10, 23, 19, .9); color: #f3f1e8; font-size: 11px; font-weight: 700; pointer-events: none; }
 .track-map { position: relative; width: 100%; min-height: 220px; flex: 1 1 auto; background: var(--map-forest); }
 .map-view #map { height: auto; min-height: 200px; }
 .profile-panel { z-index: 1; flex: 0 0 auto; padding: 9px clamp(16px, 4vw, 58px) 7px; background: var(--map-forest); color: var(--map-paper); }
@@ -487,9 +501,10 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .hero-logo-fallback { display: block; }
   .snowfall i { top: 24%; animation: none; opacity: .38; }
   .snowfall i:nth-child(even) { top: 68%; }
+  .geo-marker::after { animation: none; opacity: .5; }
 }
 
-/* РњРµС‚РєРё СЃС‚Р°СЂС‚Р° Рё С„РёРЅРёС€Р° РЅР° РєР°СЂС‚Рµ */
+/* Метки старта и финиша на карте */
 .track-marker {
   width: 32px;
   height: 32px;
@@ -508,7 +523,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .track-marker.start { background: #22c55e; }
 .track-marker.finish { background: #ef4444; }
 
-/* GPX download dialog вЂ” matches the map screen's paper, forest and lime palette. */
+/* GPX download dialog — matches the map screen's paper, forest and lime palette. */
 .download-popup-overlay {
   box-sizing: border-box;
   position: fixed;
@@ -635,7 +650,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .download-popup-qr-frame { width: 176px; height: 176px; }
   .download-popup-qr { width: 160px; height: 160px; }
 }
-/* Р­РєСЂР°РЅ РѕС€РёР±РєРё Р·Р°РіСЂСѓР·РєРё РґР°РЅРЅС‹С… Рё РїСѓСЃС‚РѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ РіР°Р»РµСЂРµРё */
+/* Экран ошибки загрузки данных и пустое состояние галереи */
 .app-error {
   --forest-deep: #0a1713;
   --lime: #c7f657;

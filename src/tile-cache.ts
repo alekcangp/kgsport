@@ -24,12 +24,29 @@ export function latToTileY(lat: number, zoom: number): number {
   return Math.max(0, Math.min(tiles - 1, y));
 }
 
+/**
+ * Шаблоны URL для стиля MapLibre. Единственный источник адресов тайлов:
+ * по ним же считается прогрев кэша, чтобы карта и кэш не расходились.
+ */
+export const IMAGERY_TILES_TEMPLATE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+export const TERRAIN_TILES_TEMPLATE =
+  'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+
+function fillTileTemplate(template: string, z: number, x: number, y: number): string {
+  return template
+    .replace('{z}', String(z))
+    .replace('{x}', String(x))
+    .replace('{y}', String(y));
+}
+
 export function imageryTileUrl(z: number, x: number, y: number): string {
-  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+  return fillTileTemplate(IMAGERY_TILES_TEMPLATE, z, x, y);
 }
 
 export function terrainTileUrl(z: number, x: number, y: number): string {
-  return `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+  return fillTileTemplate(TERRAIN_TILES_TEMPLATE, z, x, y);
 }
 
 /**

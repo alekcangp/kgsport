@@ -6,4 +6,6 @@ export interface Track {
   ascentM: number;
   bbox: [number, number, number, number];
   points: number;
+  /** Высоты по точкам трека (м). Пустой массив — данных о высотах нет. */
+  elevations: number[];
 }

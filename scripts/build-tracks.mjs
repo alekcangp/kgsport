@@ -86,6 +86,10 @@ async function main() {
     const ascent = ascentM(coords);
     const bbox = turf.bbox(turf.lineString(coords));
     const name = line.name || basename(file, ext);
+    // Высоты кладём в tracks.json, чтобы профиль строился офлайн и без внешних API.
+    // Округляем до 0.1 м — этого достаточно для профиля и уклона.
+    const elevations = coords.map((c) => Math.round((c[2] ?? 0) * 10) / 10);
+    const hasElevations = elevations.some((e) => e !== 0);
     tracks.push({
       id: basename(file, ext),
       name,
@@ -93,7 +97,8 @@ async function main() {
       distanceKm: Math.round(distanceKm * 100) / 100,
       ascentM: ascent,
       bbox,
-      points: coords.length
+      points: coords.length,
+      elevations: hasElevations ? elevations : []
     });
   }
   tracks.sort((a, b) => a.name.localeCompare(b.name));

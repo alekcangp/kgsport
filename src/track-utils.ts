@@ -16,6 +16,25 @@ export function isViewableTrackFile(file: string): boolean {
   return /\.(gpx|kml)$/i.test(file);
 }
 
+/** Относительная ссылка на файл трассы с корректным кодированием имени. */
+export function trackFileUrl(file: string): string {
+  return `./tracks/${encodeURIComponent(file)}`;
+}
+
+/**
+ * Выбирает высоты для профиля: сначала предрасчитанные при сборке,
+ * затем высоты из самого трека. Пустой массив — данных нет.
+ */
+export function resolveElevations(precomputed: readonly number[] | undefined, coords: number[][]): number[] {
+  if (Array.isArray(precomputed) && precomputed.length === coords.length) {
+    return precomputed.slice();
+  }
+  if (coords.some((c) => (c[2] ?? 0) !== 0)) {
+    return coords.map((c) => c[2] ?? 0);
+  }
+  return [];
+}
+
 /** Достаёт координаты из LineString или MultiLineString. */
 export function lineCoordinates(geometry: unknown): number[][] {
   if (!geometry || typeof geometry !== 'object') return [];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, slopeAngleAtDistance, valueAtDistance } from './track-utils';
+import { cumulativeDistancesKm, escapeHtml, isViewableTrackFile, lineCoordinates, positionAtDistance, resolveElevations, slopeAngleAtDistance, trackFileUrl, valueAtDistance } from './track-utils';
 
 describe('escapeHtml', () => {
   it('экранирует HTML-спецсимволы', () => {
@@ -25,6 +25,45 @@ describe('isViewableTrackFile', () => {
   });
 });
 
+describe('trackFileUrl', () => {
+  it('возвращает относительную ссылку для простого имени', () => {
+    expect(trackFileUrl('5A.gpx')).toBe('./tracks/5A.gpx');
+  });
+
+  it('кодирует пробелы, решётки и кириллицу', () => {
+    expect(trackFileUrl('трасса 1#.gpx')).toBe(
+      `./tracks/${encodeURIComponent('трасса 1#.gpx')}`,
+    );
+    expect(trackFileUrl('a b.gpx')).toBe('./tracks/a%20b.gpx');
+  });
+
+  it('кодирует слэши, чтобы имя не превращалось в подкаталог', () => {
+    expect(trackFileUrl('nested/track.gpx')).not.toContain('/nested/track.gpx');
+  });
+});
+
+describe('resolveElevations', () => {
+  const coords = [[73.1, 55.1, 100], [73.2, 55.2, 110], [73.3, 55.3, 90]];
+
+  it('предпочитает высоты, посчитанные при сборке', () => {
+    expect(resolveElevations([101, 111, 91], coords)).toEqual([101, 111, 91]);
+  });
+
+  it('берёт высоты из трека, если предрасчитанных нет', () => {
+    expect(resolveElevations(undefined, coords)).toEqual([100, 110, 90]);
+    expect(resolveElevations([], coords)).toEqual([100, 110, 90]);
+  });
+
+  it('игнорирует предрасчитанные высоты неверной длины', () => {
+    expect(resolveElevations([1, 2], coords)).toEqual([100, 110, 90]);
+  });
+
+  it('возвращает пустой массив, если высот нет нигде', () => {
+    expect(resolveElevations([], [[73.1, 55.1], [73.2, 55.2]])).toEqual([]);
+    expect(resolveElevations(undefined, [[73.1, 55.1, 0], [73.2, 55.2, 0]])).toEqual([]);
+  });
+});
+
 describe('lineCoordinates', () => {
   it('возвращает координаты LineString', () => {
     expect(lineCoordinates({
@@ -47,6 +86,44 @@ describe('lineCoordinates', () => {
     expect(lineCoordinates({ type: 'Point', coordinates: [73.1, 55.1] })).toEqual([]);
     expect(lineCoordinates({ type: 'LineString', coordinates: [[73.1]] })).toEqual([]);
     expect(lineCoordinates(null)).toEqual([]);
+  });
+
+  it('пропускает пустые и невалидные сегменты MultiLineString', () => {
+    expect(lineCoordinates({
+      type: 'MultiLineString',
+      coordinates: [
+        [],
+        [[73.1, 55.1], 'мусор', [73.2, 55.2]],
+        [[73.3, 55.3, 100], [73.4, 55.4]],
+      ],
+    })).toEqual([[73.1, 55.1], [73.2, 55.2], [73.3, 55.3, 100], [73.4, 55.4]]);
+  });
+
+  it('сохраняет порядок сегментов MultiLineString', () => {
+    const coords = lineCoordinates({
+      type: 'MultiLineString',
+      coordinates: [
+        [[1, 1], [2, 2]],
+        [[3, 3], [4, 4]],
+        [[5, 5], [6, 6]],
+      ],
+    });
+    expect(coords).toEqual([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6]]);
+  });
+
+  // Известное ограничение: сегменты склеиваются без разрыва, поэтому дистанция
+  // между концом одного сегмента и началом следующего входит в общий пробег.
+  it('учитывает перегон между сегментами MultiLineString', () => {
+    const coords = lineCoordinates({
+      type: 'MultiLineString',
+      coordinates: [
+        [[0, 0], [0, 0.001]],
+        [[0, 1], [0, 1.001]],
+      ],
+    });
+    const dists = cumulativeDistancesKm(coords);
+    expect(dists).toHaveLength(4);
+    expect(dists[2] - dists[1]).toBeGreaterThan(100);
   });
 });
 
