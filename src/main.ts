@@ -49,6 +49,8 @@ let cruiseToggle: (() => void) | null = null;
 /** Геолокация: включается в initViewer, останавливается при уходе с экрана. */
 let locateToggle: (() => void) | null = null;
 let stopGeolocation: (() => void) | null = null;
+/** Отписка от оконных слушателей жестов круиза при удалении карты. */
+let cruiseGestureController: AbortController | null = null;
 
 const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
 const SAMPLE_STEP_M = 5;
@@ -207,6 +209,7 @@ function destroyMap() {
   }
   const map = currentMap;
   currentMap = null;
+  if (cruiseGestureController) { cruiseGestureController.abort(); cruiseGestureController = null; }
   if (map) {
     try {
       map.remove();
@@ -565,11 +568,101 @@ async function initViewer(t: Track, requestId: number) {
   const totalDistanceKm = () => dists[dists.length - 1] ?? 0;
 
   /**
+   * Держит метку круиза в кадре, не центрируя карту: пока метка внутри
+   * безопасной зоны — камеру не трогаем (пользователь может свободно
+   * перетаскивать карту). Если метка подошла к краю — сдвигаем камеру
+   * ровно настолько, чтобы вернуть её в зону.
+   *
+   * Пока пользователь сам двигает карту (drag/zoom/pinch) и короткое время
+   * после — автоподвод полностью отключён: иначе анимация подвода
+   * перехватывает управление и карту «не отпускает».
+   */
+  const CRUISE_EDGE_MARGIN = 0.15; // за этой границей начинаем подвод
+  const CRUISE_INNER_MARGIN = 0.3; // куда возвращаем метку (гистерезис)
+  let cruiseFollowSuspended = false;
+  let cruiseFollowTimer: number | null = null;
+  let nextCruiseNudgeAt = 0;
+
+  const suspendCruiseFollow = () => {
+    cruiseFollowSuspended = true;
+    // Останавливаем только анимацию подвода камеры, не трогая жесты
+    // пользователя (stop(true) сохраняет активный drag/zoom).
+    const camera = map as unknown as { isEasing?: () => boolean; stop: (allowGestures?: boolean) => unknown };
+    if (camera.isEasing?.()) camera.stop(true);
+    if (cruiseFollowTimer !== null) window.clearTimeout(cruiseFollowTimer);
+  };
+  const scheduleCruiseFollowResume = () => {
+    if (cruiseFollowTimer !== null) window.clearTimeout(cruiseFollowTimer);
+    cruiseFollowTimer = window.setTimeout(() => {
+      cruiseFollowSuspended = false;
+      cruiseFollowTimer = null;
+    }, 400);
+  };
+  map.on('dragstart', suspendCruiseFollow);
+  map.on('zoomstart', suspendCruiseFollow);
+  map.on('rotatestart', suspendCruiseFollow);
+  map.on('pitchstart', suspendCruiseFollow);
+  map.on('dragend', scheduleCruiseFollowResume);
+  map.on('zoomend', scheduleCruiseFollowResume);
+  map.on('rotateend', scheduleCruiseFollowResume);
+  map.on('pitchend', scheduleCruiseFollowResume);
+
+  // Дублируем на уровне канваса и окна: события карты не всегда приходят
+  // (например, при синтетических жестах), а жест пользователя надо поймать
+  // в любом случае — и обязательно отпустить после окончания.
+  const gestureCanvas = map.getCanvas();
+  const gestureSignals = new AbortController();
+  cruiseGestureController = gestureSignals;
+  const { signal: gestureSignal } = gestureSignals;
+  gestureCanvas.addEventListener('pointerdown', suspendCruiseFollow);
+  gestureCanvas.addEventListener('mousedown', suspendCruiseFollow);
+  gestureCanvas.addEventListener('touchstart', suspendCruiseFollow, { passive: true });
+  gestureCanvas.addEventListener('wheel', () => {
+    suspendCruiseFollow();
+    scheduleCruiseFollowResume();
+  }, { passive: true });
+  window.addEventListener('pointerup', scheduleCruiseFollowResume, { signal: gestureSignal });
+  window.addEventListener('pointercancel', scheduleCruiseFollowResume, { signal: gestureSignal });
+  window.addEventListener('mouseup', scheduleCruiseFollowResume, { signal: gestureSignal });
+  window.addEventListener('touchend', scheduleCruiseFollowResume, { signal: gestureSignal });
+  window.addEventListener('touchcancel', scheduleCruiseFollowResume, { signal: gestureSignal });
+
+  const keepCruiseMarkerVisible = (lng: number, lat: number) => {
+    // Пока пользователь управляет картой — не вмешиваемся вообще.
+    if (cruiseFollowSuspended) return;
+    // Не запускаем новый подвод, пока идёт предыдущий (защита от «микро-сдвигов»).
+    const now = performance.now();
+    if (now < nextCruiseNudgeAt) return;
+    const canvas = map.getCanvas();
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!w || !h) return;
+    const point = map.project([lng, lat]);
+    const edgeX = w * CRUISE_EDGE_MARGIN;
+    const edgeY = h * CRUISE_EDGE_MARGIN;
+    const outside = point.x < edgeX || point.x > w - edgeX
+      || point.y < edgeY || point.y > h - edgeY;
+    if (!outside) return;
+    // Возвращаем метку не к самой границе, а вглубь зоны — тогда подвод
+    // не срабатывает на следующем кадре (гистерезис, меньше микро-сдвигов).
+    const insideX = w * CRUISE_INNER_MARGIN;
+    const insideY = h * CRUISE_INNER_MARGIN;
+    const targetX = Math.min(Math.max(point.x, insideX), w - insideX);
+    const targetY = Math.min(Math.max(point.y, insideY), h - insideY);
+    // Новый центр — так, чтобы метка оказалась в целевой точке зоны.
+    const center = map.unproject([w / 2 + (point.x - targetX), h / 2 + (point.y - targetY)]);
+    // freezeElevation: не пересчитываем высоту рельефа, иначе маркеры дрожат.
+    map.easeTo({ center: [center.lng, center.lat], duration: 200, essential: true, freezeElevation: true });
+    nextCruiseNudgeAt = now + 260;
+  };
+
+  /**
    * Ставит метку на дистанцию и синхронизирует карту, профиль и тулбар.
    * `marker: false` двигает только профиль, не показывая маркер круиза
    * (так делает геолокация — у неё своя синяя точка).
+   * `follow: true` — не центрировать карту, лишь удерживать метку в кадре.
    */
-  const applySeek = (km: number, options: { pan?: boolean; marker?: boolean } = {}) => {
+  const applySeek = (km: number, options: { pan?: boolean; marker?: boolean; follow?: boolean } = {}) => {
     if (!dists.length) return;
     const total = totalDistanceKm();
     const target = Math.min(Math.max(km, 0), total);
@@ -588,7 +681,13 @@ async function initViewer(t: Track, requestId: number) {
     }
 
     if (options.pan !== false) {
-      try { map.panTo([position.lng, position.lat], { animate: false, duration: 0 }); } catch {}
+      try {
+        if (options.follow) {
+          keepCruiseMarkerVisible(position.lng, position.lat);
+        } else {
+          map.panTo([position.lng, position.lat], { animate: false, duration: 0 });
+        }
+      } catch {}
     }
 
     redrawProfile();
@@ -728,7 +827,7 @@ async function initViewer(t: Track, requestId: number) {
     }
     lastFrameTime = timestamp;
 
-    applySeek(cruiseDistanceKm, { pan: !logoMotionPreference.matches });
+    applySeek(cruiseDistanceKm, { pan: !logoMotionPreference.matches, follow: true });
     if (isFlying) flyRafId = requestAnimationFrame(flyStep);
   };
 
@@ -783,6 +882,9 @@ async function initViewer(t: Track, requestId: number) {
   let geoWatchId: number | null = null;
   let geoMarker: Marker | null = null;
   let geoActive = false;
+  // Пока геолокация включена, снимаем ограничение карты по bbox трассы,
+  // чтобы можно было показать точку за её пределами. При выключении вернём.
+  let savedMaxBounds: ReturnType<MapLibreMap['getMaxBounds']> = null;
 
   const setLocateState = (active: boolean) => {
     geoActive = active;
@@ -801,18 +903,32 @@ async function initViewer(t: Track, requestId: number) {
     geoWatchId = null;
   };
 
-  const stopGeo = () => {
+  /** Трасса хотя бы частично видна в текущем окне карты. */
+  const isTrackVisible = () => {
+    const b = map.getBounds();
+    return b.getWest() <= maxLng && b.getEast() >= minLng && b.getSouth() <= maxLat && b.getNorth() >= minLat;
+  };
+
+  const leaveGeo = () => {
     clearGeoWatch();
     if (geoMarker) { geoMarker.remove(); geoMarker = null; }
     setLocateState(false);
+    if (savedMaxBounds) { map.setMaxBounds(savedMaxBounds); savedMaxBounds = null; }
+    // Если трасса и так в кадре (точка была рядом) — камеру не трогаем.
+    // Если уехали далеко — сразу показываем всю трассу, без анимации скролла.
+    if (!isTrackVisible()) {
+      map.jumpTo({ center: [coords[0][0], coords[0][1]], zoom: 15, pitch: 45, bearing: 0 });
+    }
+  };
+
+  const stopGeo = () => {
+    leaveGeo();
     if (geoStatus) { geoStatus.hidden = true; geoStatus.textContent = ''; }
   };
   stopGeolocation = stopGeo;
 
   const onGeoError = (error: GeolocationPositionError) => {
-    clearGeoWatch();
-    if (geoMarker) { geoMarker.remove(); geoMarker = null; }
-    setLocateState(false);
+    leaveGeo();
     showGeoStatus(error.code === error.PERMISSION_DENIED
       ? 'Доступ к геолокации запрещён'
       : 'Не удалось определить местоположение');
@@ -826,11 +942,15 @@ async function initViewer(t: Track, requestId: number) {
       const el = document.createElement('div');
       el.className = 'geo-marker';
       el.setAttribute('aria-hidden', 'true');
-      geoMarker = new maplibre.Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
-      map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 15), duration: 600 });
+      geoMarker = new maplibre.Marker({ element: el, anchor: 'center', subpixelPositioning: true }).setLngLat(lngLat).addTo(map);
+      const zoom = Math.max(map.getZoom(), 15);
+      // Далеко за пределами экрана — прыгаем сразу, иначе анимация уводит камеру
+      // через всю карту и точку не видно, пока она не доедет.
+      if (map.getBounds().contains(lngLat)) map.easeTo({ center: lngLat, zoom, duration: 600, freezeElevation: true });
+      else map.jumpTo({ center: lngLat, zoom });
     } else {
       geoMarker.setLngLat(lngLat);
-      if (!map.getBounds().contains(lngLat)) map.panTo(lngLat);
+      if (!map.getBounds().contains(lngLat)) map.jumpTo({ center: lngLat });
     }
 
     const snapped = nearestPointOnLine(lineString(coords), lngLat, { units: 'kilometers' });
@@ -854,6 +974,8 @@ async function initViewer(t: Track, requestId: number) {
     }
     stopCruise();
     setLocateState(true);
+    if (!savedMaxBounds) savedMaxBounds = map.getMaxBounds();
+    map.setMaxBounds(null);
     showGeoStatus('Определяем местоположение…');
     try {
       geoWatchId = navigator.geolocation.watchPosition(onGeoFix, onGeoError, {
