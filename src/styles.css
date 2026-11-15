@@ -66,6 +66,8 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   cursor: pointer;
   transition: background .2s, border-color .2s, transform .2s;
 }
+/* Кнопка не должна растягиваться на всю колонку тулбара в узком ландшафте. */
+.map-back { justify-self: start; width: fit-content; }
 .map-back > .ui-icon, .map-action > .ui-icon { color: var(--map-lime); font-size: 16px; }
 .map-back:hover, .map-action:hover { transform: translateY(-1px); border-color: var(--map-lime); background: rgba(243, 241, 232, .1); }
 .map-action:disabled { opacity: .5; cursor: default; }

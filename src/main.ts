@@ -115,10 +115,25 @@ function isHomeScreenVisible(): boolean {
   return !!homeScreen && !homeScreen.hidden;
 }
 
+/** Цвет главного экрана: он же используется для системных панелей в APK. */
+const HOME_THEME_COLOR = '#102536';
+
+/**
+ * Мост в APK: в браузере полосы сверху и снизу красит meta theme-color, а WebView
+ * её игнорирует, поэтому нативный слой получает цвет текущего экрана явно.
+ */
+type SystemBarsBridge = { setColor?: (color: string) => void };
+
+function pushSystemBarColor(color: string) {
+  const bridge = (window as Window & { KgsTheme?: SystemBarsBridge }).KgsTheme;
+  bridge?.setColor?.(color);
+}
+
 function setThemeColor(color: string) {
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', color);
   document.documentElement.style.backgroundColor = color;
   document.body.style.backgroundColor = color;
+  pushSystemBarColor(color);
 }
 
 function resetScrollPosition() {
@@ -290,7 +305,7 @@ function showScreen(screen: 'home' | 'routes') {
 
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
-  setThemeColor(screen === 'home' ? '#102536' : '#0a1713');
+  setThemeColor(screen === 'home' ? HOME_THEME_COLOR : '#0a1713');
   resetScrollPosition();
   syncLogoMotion();
 
