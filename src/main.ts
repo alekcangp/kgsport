@@ -63,6 +63,11 @@ const UI_ICONS = {
   play: '<path d="m8 5 12 7-12 7z" fill="currentColor" stroke="none"/>',
   close: '<path d="m18 6-12 12M6 6l12 12"/>',
   locate: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>',
+  rotateLeft: '<path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+  rotateRight: '<path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  tiltUp: '<path d="M4 20h16"/><path d="M12 17V6"/><path d="m8 10 4-4 4 4"/>',
+  tiltDown: '<path d="M4 4h16"/><path d="M12 7v11"/><path d="m8 14 4 4 4-4"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.4 8.6-2.3 5.8-5.1 1 2.3-5.8z" fill="currentColor" stroke="none"/>',
 } as const;
 
 function uiIcon(name: keyof typeof UI_ICONS): string {
@@ -446,7 +451,7 @@ function showViewer(t: Track) {  const requestId = ++viewerRequestId;
         </div>
         <div class="map-actions"><button id="locate" class="map-action map-action-icon" type="button" aria-label="Моё местоположение" aria-pressed="false" title="Моё местоположение">${uiIcon('locate')}</button><button id="cruise" class="map-action map-action-primary" type="button">${uiIcon('play')} Круиз</button><button id="download" class="map-action" type="button">${uiIcon('down')} ${fileFormat}</button></div>
       </header>
-      <div id="map" class="track-map"><p id="map-status" class="map-status" role="status" hidden></p><p id="geo-status" class="geo-status" role="status" aria-live="polite" hidden></p></div>
+      <div id="map" class="track-map"><p id="map-status" class="map-status" role="status" hidden></p><p id="geo-status" class="geo-status" role="status" aria-live="polite" hidden></p><div class="map-orient" role="group" aria-label="Вид карты"><button id="view-up" class="map-orient-btn map-orient-up" type="button" aria-label="Наклонить выше" title="Наклонить выше">${uiIcon('tiltUp')}</button><button id="view-left" class="map-orient-btn map-orient-left" type="button" aria-label="Повернуть влево" title="Повернуть влево">${uiIcon('rotateLeft')}</button><button id="view-reset" class="map-orient-btn map-orient-center" type="button" aria-label="Сбросить вид" title="Сбросить вид">${uiIcon('compass')}</button><button id="view-right" class="map-orient-btn map-orient-right" type="button" aria-label="Повернуть вправо" title="Повернуть вправо">${uiIcon('rotateRight')}</button><button id="view-down" class="map-orient-btn map-orient-down" type="button" aria-label="Наклонить ниже" title="Наклонить ниже">${uiIcon('tiltDown')}</button></div></div>
       <section class="profile-panel" aria-label="Профиль высот маршрута">
         <div class="profile-heading"><strong>ПРОФИЛЬ ВЫСОТ</strong><span>Нажмите на график или трек, чтобы выбрать точку</span></div>
         <canvas id="profile" class="profile-canvas" tabindex="0" aria-label="Профиль высот: стрелки меняют положение метки"></canvas>
@@ -550,6 +555,8 @@ async function initViewer(t: Track, requestId: number) {
     maxZoom: 16,
     pitch: 45,
     bearing: 0,
+    minPitch: 0,
+    maxPitch: 60,
     maxBounds: [[minLng - pad, minLat - pad], [maxLng + pad, maxLat + pad]]
   });
   currentMap = map;
@@ -626,6 +633,81 @@ async function initViewer(t: Track, requestId: number) {
   window.addEventListener('mouseup', scheduleCruiseFollowResume, { signal: gestureSignal });
   window.addEventListener('touchend', scheduleCruiseFollowResume, { signal: gestureSignal });
   window.addEventListener('touchcancel', scheduleCruiseFollowResume, { signal: gestureSignal });
+
+  // --- Ориентация вида: поворот/наклон/сброс кнопками ---
+  // Нужно на Android TV и для USB-мыши, где нет правой кнопки, а штатный
+  // поворот MapLibre работает только на ПКМ или Ctrl+ЛКМ.
+  const BEARING_STEP = 15;
+  const PITCH_STEP = 10;
+  const PITCH_MIN = 0;
+  const PITCH_MAX = 60;
+  const RESET_PITCH = 45;
+  let viewBearing = map.getBearing();
+  let viewPitch = map.getPitch();
+
+  const applyView = () => {
+    viewPitch = Math.min(Math.max(viewPitch, PITCH_MIN), PITCH_MAX);
+    viewBearing = ((viewBearing + 540) % 360) - 180;
+    map.easeTo({
+      bearing: viewBearing,
+      pitch: viewPitch,
+      duration: 200,
+      essential: true,
+      freezeElevation: true,
+    });
+  };
+
+  type ViewAction = 'left' | 'right' | 'up' | 'down' | 'reset';
+  const viewStep = (action: ViewAction) => {
+    if (action === 'reset') {
+      viewBearing = 0;
+      viewPitch = RESET_PITCH;
+    } else if (action === 'left') viewBearing -= BEARING_STEP;
+    else if (action === 'right') viewBearing += BEARING_STEP;
+    else if (action === 'up') viewPitch += PITCH_STEP;
+    else viewPitch -= PITCH_STEP;
+    applyView();
+  };
+
+  const viewControls: Array<[string, ViewAction]> = [
+    ['view-left', 'left'],
+    ['view-right', 'right'],
+    ['view-up', 'up'],
+    ['view-down', 'down'],
+    ['view-reset', 'reset'],
+  ];
+  for (const [id, action] of viewControls) {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    if (!button) continue;
+    let holdTimer: number | null = null;
+    const stopHold = () => {
+      if (holdTimer !== null) { window.clearInterval(holdTimer); holdTimer = null; }
+      scheduleCruiseFollowResume();
+    };
+    button.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      // Синхронизируем цель с текущим видом (учитываем внешние изменения).
+      viewBearing = map.getBearing();
+      viewPitch = map.getPitch();
+      suspendCruiseFollow();
+      viewStep(action);
+      if (action !== 'reset') holdTimer = window.setInterval(() => viewStep(action), 150);
+      try { button.setPointerCapture(event.pointerId); } catch { /* синтетические события */ }
+    });
+    button.addEventListener('pointerup', stopHold);
+    button.addEventListener('pointercancel', stopHold);
+    button.addEventListener('lostpointercapture', stopHold);
+    button.addEventListener('click', (event) => {
+      // Активация с клавиатуры или пульта (Enter/Space) идёт без pointerdown.
+      if (event.detail !== 0) return;
+      viewBearing = map.getBearing();
+      viewPitch = map.getPitch();
+      suspendCruiseFollow();
+      viewStep(action);
+      scheduleCruiseFollowResume();
+    });
+  }
 
   const keepCruiseMarkerVisible = (lng: number, lat: number) => {
     // Пока пользователь управляет картой — не вмешиваемся вообще.
@@ -892,10 +974,23 @@ async function initViewer(t: Track, requestId: number) {
     locateButton.setAttribute('aria-pressed', String(active));
   };
 
+  let geoStatusTimer: number | null = null;
+  const hideGeoStatus = () => {
+    if (geoStatusTimer !== null) { window.clearTimeout(geoStatusTimer); geoStatusTimer = null; }
+    if (geoStatus) { geoStatus.hidden = true; geoStatus.textContent = ''; }
+  };
+
   const showGeoStatus = (text: string) => {
+    if (geoStatusTimer !== null) { window.clearTimeout(geoStatusTimer); geoStatusTimer = null; }
     if (!geoStatus) return;
     geoStatus.hidden = false;
     geoStatus.textContent = text;
+  };
+
+  // Разовые сообщения (ошибки доступа и т.п.) прячем автоматически по таймеру.
+  const showGeoStatusTemporary = (text: string, ms = 5000) => {
+    showGeoStatus(text);
+    geoStatusTimer = window.setTimeout(hideGeoStatus, ms);
   };
 
   const clearGeoWatch = () => {
@@ -923,13 +1018,13 @@ async function initViewer(t: Track, requestId: number) {
 
   const stopGeo = () => {
     leaveGeo();
-    if (geoStatus) { geoStatus.hidden = true; geoStatus.textContent = ''; }
+    hideGeoStatus();
   };
   stopGeolocation = stopGeo;
 
   const onGeoError = (error: GeolocationPositionError) => {
     leaveGeo();
-    showGeoStatus(error.code === error.PERMISSION_DENIED
+    showGeoStatusTemporary(error.code === error.PERMISSION_DENIED
       ? 'Доступ к геолокации запрещён'
       : 'Не удалось определить местоположение');
   };
@@ -969,7 +1064,7 @@ async function initViewer(t: Track, requestId: number) {
   const startGeo = () => {
     if (geoActive) return;
     if (!('geolocation' in navigator)) {
-      showGeoStatus('Геолокация не поддерживается');
+      showGeoStatusTemporary('Геолокация не поддерживается');
       return;
     }
     stopCruise();
@@ -985,7 +1080,7 @@ async function initViewer(t: Track, requestId: number) {
       });
     } catch {
       setLocateState(false);
-      showGeoStatus('Не удалось определить местоположение');
+      showGeoStatusTemporary('Не удалось определить местоположение');
     }
   };
 

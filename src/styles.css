@@ -94,6 +94,17 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .geo-marker::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid rgba(47, 124, 246, .55); animation: geo-pulse 2s ease-out infinite; }
 @keyframes geo-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
 .geo-status { position: absolute; z-index: 5; left: 12px; bottom: 12px; max-width: calc(100% - 24px); margin: 0; padding: 7px 11px; border: 1px solid rgba(199, 246, 87, .35); border-radius: 999px; background: rgba(10, 23, 19, .9); color: #f3f1e8; font-size: 11px; font-weight: 700; pointer-events: none; }
+.map-orient { position: absolute; z-index: 6; top: 12px; right: 12px; display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 6px; }
+.map-orient-btn { display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid rgba(243, 241, 232, .24); border-radius: 8px; background: rgba(10, 23, 19, .82); color: var(--map-lime); cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.map-orient-btn > .ui-icon { font-size: 18px; }
+.map-orient-btn:hover { border-color: var(--map-lime); background: rgba(243, 241, 232, .12); }
+.map-orient-btn:active { background: rgba(199, 246, 87, .22); }
+.map-orient-btn:focus-visible { outline: 2px solid var(--map-lime); outline-offset: 2px; }
+.map-orient-up { grid-area: 1 / 2; }
+.map-orient-left { grid-area: 2 / 1; }
+.map-orient-center { grid-area: 2 / 2; }
+.map-orient-right { grid-area: 2 / 3; }
+.map-orient-down { grid-area: 3 / 2; }
 .track-map { position: relative; width: 100%; min-height: 220px; flex: 1 1 auto; background: var(--map-forest); }
 .map-view #map { height: auto; min-height: 200px; }
 .profile-panel { z-index: 1; flex: 0 0 auto; padding: 9px clamp(16px, 4vw, 58px) 7px; background: var(--map-forest); color: var(--map-paper); }
