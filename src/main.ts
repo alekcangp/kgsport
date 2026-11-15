@@ -36,7 +36,7 @@ const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)
 
 
 let isFlying = false;
-const CRUISE_SPEED_KMH = 120;
+const CRUISE_SPEED_KMH = 160;
 const GLIDE_MS = 250;
 const TRACK_CLICK_TOLERANCE_PX = 24;
 const TRACK_HIT_LAYER_IDS = ['track-ascent-line', 'track-descent-line', 'track-flat-line'] as const;
@@ -680,27 +680,43 @@ async function initViewer(t: Track, requestId: number) {
     const button = document.getElementById(id) as HTMLButtonElement | null;
     if (!button) continue;
     let holdTimer: number | null = null;
+    let pointerDownOccurred = false;
+    let pointerDownClearTimer: number | null = null;
+    const clearPointerDownFlag = () => {
+      if (pointerDownClearTimer !== null) { window.clearTimeout(pointerDownClearTimer); pointerDownClearTimer = null; }
+      pointerDownClearTimer = window.setTimeout(() => {
+        pointerDownOccurred = false;
+        pointerDownClearTimer = null;
+      }, 0);
+    };
     const stopHold = () => {
       if (holdTimer !== null) { window.clearInterval(holdTimer); holdTimer = null; }
       scheduleCruiseFollowResume();
+      clearPointerDownFlag();
     };
     button.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
       event.preventDefault();
+      pointerDownOccurred = true;
       // Синхронизируем цель с текущим видом (учитываем внешние изменения).
       viewBearing = map.getBearing();
       viewPitch = map.getPitch();
       suspendCruiseFollow();
       viewStep(action);
-      if (action !== 'reset') holdTimer = window.setInterval(() => viewStep(action), 150);
+      if (action !== 'reset') holdTimer = window.setInterval(() => viewStep(action), 220);
       try { button.setPointerCapture(event.pointerId); } catch { /* синтетические события */ }
     });
     button.addEventListener('pointerup', stopHold);
     button.addEventListener('pointercancel', stopHold);
     button.addEventListener('lostpointercapture', stopHold);
-    button.addEventListener('click', (event) => {
+    button.addEventListener('click', () => {
+      // Реальный клик мыши/тача: шаг уже сделан в pointerdown — не дублируем.
+      if (pointerDownOccurred) {
+        if (pointerDownClearTimer !== null) { window.clearTimeout(pointerDownClearTimer); pointerDownClearTimer = null; }
+        pointerDownOccurred = false;
+        return;
+      }
       // Активация с клавиатуры или пульта (Enter/Space) идёт без pointerdown.
-      if (event.detail !== 0) return;
       viewBearing = map.getBearing();
       viewPitch = map.getPitch();
       suspendCruiseFollow();
