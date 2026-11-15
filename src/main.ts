@@ -77,12 +77,15 @@ function uiIcon(name: keyof typeof UI_ICONS): string {
 /**
  * Значки в центре QR — готовые 3D-картинки: глобус из набора Microsoft Fluent
  * Emoji (3D, лицензия MIT) и 3D-голова Android-робота с Викисклада (Google,
- * CC BY 3.0). Лежат в public/, поэтому попадают и в dist, и в precache service
- * worker, то есть работают в APK без сети.
+ * CC BY 3.0). Оба лежат в public/ готовым растр-изображением: на плашке значок
+ * показывается размером 18 px (12 px на телефоне), поэтому векторный SVG
+ * с внутренними блюрами превращался в кашу, а уменьшенный PNG остаётся резким.
+ * Файлы попадают и в dist, и в precache service worker, то есть работают в APK
+ * без сети.
  */
 const QR_BADGE_ICONS = {
   globe: 'qr-globe-3d.png',
-  android: 'qr-android-3d.svg',
+  android: 'qr-android-3d.png',
 } as const;
 
 /**
