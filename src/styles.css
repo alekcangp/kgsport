@@ -196,6 +196,10 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .map-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
   .map-back, .map-action { min-height: 36px; }
 }
+/* В горизонтали на телефоне элементы шапки карты помещаются в одну строку. */
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 621px) {
+  .map-toolbar { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+}
 @media (pointer: coarse) {
   .map-view .maplibregl-ctrl-group button { width: 44px; height: 44px; }
   .track-card { touch-action: manipulation; }

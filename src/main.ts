@@ -118,6 +118,9 @@ function isHomeScreenVisible(): boolean {
 /** Цвет главного экрана: он же используется для системных панелей в APK. */
 const HOME_THEME_COLOR = '#102536';
 
+/** Экран трасс и карта: первый стоп градиента .routes-screen и фон .map-view. */
+const ROUTES_THEME_COLOR = '#10251f';
+
 /**
  * Мост в APK: в браузере полосы сверху и снизу красит meta theme-color, а WebView
  * её игнорирует, поэтому нативный слой получает цвет текущего экрана явно.
@@ -298,6 +301,32 @@ function showLoadError(error: unknown) {
   });
 }
 
+/**
+ * Системная кнопка «Назад» в APK: закрывает верхний слой (окно загрузки, карту,
+ * список трасс), а не уводит из приложения. Вызывается из MainActivity, поэтому
+ * сама по себе ничего не слушает в браузере.
+ */
+function handleSystemBack(): 'handled' | 'exit' {
+  const popupClose = document.getElementById('download-popup-close');
+  if (popupClose) {
+    popupClose.click();
+    return 'handled';
+  }
+  const mapBack = document.getElementById('back');
+  if (mapBack) {
+    mapBack.click();
+    return 'handled';
+  }
+  const routesScreen = document.getElementById('routes-screen');
+  if (routesScreen && !routesScreen.hidden) {
+    document.getElementById('show-home')?.click();
+    return 'handled';
+  }
+  return 'exit';
+}
+
+(window as Window & { KgsBack?: () => string }).KgsBack = handleSystemBack;
+
 function showScreen(screen: 'home' | 'routes') {
   const homeScreen = document.getElementById('home-screen');
   const routesScreen = document.getElementById('routes-screen');
@@ -305,7 +334,8 @@ function showScreen(screen: 'home' | 'routes') {
 
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
-  setThemeColor(screen === 'home' ? HOME_THEME_COLOR : '#0a1713');
+  // Верх экрана трасс — это собственный фон страницы (#10251f), а не --forest-deep.
+  setThemeColor(screen === 'home' ? HOME_THEME_COLOR : ROUTES_THEME_COLOR);
   resetScrollPosition();
   syncLogoMotion();
 
@@ -484,7 +514,7 @@ async function drawThumbnail(t: Track) {
 }
 function showViewer(t: Track) {  const requestId = ++viewerRequestId;
   homeVideo = null;
-  setThemeColor('#10251f');
+  setThemeColor(ROUTES_THEME_COLOR);
   resetScrollPosition();
   document.body.classList.add('map-open');
   const trackName = escapeHtml(t.name);
