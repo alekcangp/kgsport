@@ -242,7 +242,7 @@ function showScreen(screen: 'home' | 'routes') {
 
   homeScreen.hidden = screen !== 'home';
   routesScreen.hidden = screen !== 'routes';
-  setThemeColor(screen === 'home' ? '#102536' : '#f3f1e8');
+  setThemeColor(screen === 'home' ? '#102536' : '#0a1713');
   resetScrollPosition();
   syncLogoMotion();
 
