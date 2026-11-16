@@ -45,7 +45,3 @@ npm run format         # Prettier
 - `src/` — исходный код приложения
 - `scripts/build-tracks.mjs` — генерация `public/tracks.json` из файлов в `public/tracks`
 - `public/tracks/` — исходные GPX трассы
-
-## Лицензия
-
-MIT

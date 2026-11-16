@@ -91,35 +91,17 @@ function uiIcon(name: keyof typeof UI_ICONS): string {
 }
 
 /**
- * Значки в центре QR — готовые 3D-картинки: глобус из набора Microsoft Fluent
- * Emoji (3D, лицензия MIT) и 3D-голова Android-робота с Викисклада (Google,
- * CC BY 3.0). Оба лежат в public/ готовым растр-изображением: на плашке значок
- * показывается размером 18 px (12 px на телефоне), поэтому векторный SVG
- * с внутренними блюрами превращался в кашу, а уменьшенный PNG остаётся резким.
- * Файлы попадают и в dist, и в precache service worker, то есть работают в APK
- * без сети.
+ * Рисует QR-код. Версия зафиксирована (сетка 41×41 модуль): оба кода на главном
+ * экране имеют одинаковую плотность и рисуются симметрично в своих плашках.
+ * Отступ 3 модуля: белая тихая зона не даёт скруглению углов плитки
+ * задевать угловые метки кода.
  */
-const QR_BADGE_ICONS = {
-  globe: 'qr-globe-3d.png',
-  android: 'qr-android-3d.png',
-} as const;
-
-/**
- * Значок в центре QR. Накладывается поверх канваса отдельным элементом: белая
- * плашка закрывает часть модулей (уровень коррекции H это допускает), а картинка
- * остаётся резкой на экране с любым DPI и не перерисовывается вместе с кодом.
- */
-function qrBadge(name: keyof typeof QR_BADGE_ICONS): string {
-  return `<span class="qr-badge qr-badge-${name}" aria-hidden="true"><img src="./${QR_BADGE_ICONS[name]}" alt="" decoding="async" draggable="false"></span>`;
-}
-
-/** Рисует QR-код с высоким уровнем коррекции: центр перекрывает значок из разметки. */
 function renderQr(canvas: HTMLCanvasElement | null, url: string) {
   if (!canvas) return;
   QRCode.toCanvas(canvas, url, {
     width: canvas.width,
-    margin: 1,
-    errorCorrectionLevel: 'H',
+    margin: 3,
+    version: 6,
     color: { dark: '#10251f', light: '#ffffff' },
   }, (err) => {
     if (err) console.error('QR code error:', err);
@@ -412,12 +394,14 @@ function renderGallery(tracks: Track[]) {
               <div class="hero-fact"><strong>${maxDistanceKm.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}<i> км</i></strong><span>МАКС. ДЛИНА</span></div>
               <div class="hero-fact"><strong>${maxAscentM}<i> м</i></strong><span>НАБОР ВЫСОТЫ</span></div>
             </div>
-            <div class="hero-qr-card">
+            <div class="hero-qr-row">
               <div class="qr-item">
-                <div class="qr-frame"><canvas id="site-qr" width="144" height="144" aria-label="QR-код: веб-сайт Крутая горка"></canvas>${qrBadge('globe')}</div>
+                <canvas id="site-qr" width="144" height="144" aria-label="QR-код: веб-сайт Крутая горка"></canvas>
+                <span class="qr-caption">Веб-сайт</span>
               </div>
               <div class="qr-item">
-                <div class="qr-frame"><canvas id="android-qr" width="144" height="144" aria-label="QR-код: APK-приложение для Android"></canvas>${qrBadge('android')}</div>
+                <canvas id="android-qr" width="144" height="144" aria-label="QR-код: APK-приложение для Android"></canvas>
+                <span class="qr-caption">Скачать APK</span>
               </div>
             </div>
           </div>
