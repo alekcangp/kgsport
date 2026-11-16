@@ -318,7 +318,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .primary-cta > .ui-icon { font-size: 18px; }
 .hero-note { display: flex; align-items: center; gap: 10px; margin-top: 25px; color: rgba(241, 245, 235, .48); font-size: 10px; letter-spacing: .04em; }
 .hero-note-line { width: 25px; height: 1px; background: var(--lime); }
-.hero-facts { display: flex; align-items: stretch; gap: clamp(18px, 3vw, 34px); margin-top: 32px; }
+.hero-facts { display: flex; align-items: stretch; gap: clamp(18px, 4vw, 34px); margin-top: 32px; }
 .hero-fact { display: flex; flex-direction: column; gap: 6px; }
 .hero-fact strong { color: var(--paper); font-size: 21px; font-weight: 900; letter-spacing: -.055em; line-height: 1; }
 .hero-fact strong i { color: var(--lime); font-size: 11px; font-style: normal; letter-spacing: 0; }
@@ -483,7 +483,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .hero-description { max-width: 390px; font-size: 13px; line-height: 1.65; }
   .primary-cta { min-width: 215px; margin-top: 19px; padding: 14px 17px; }
   .hero-note { margin-top: 15px; font-size: 9px; }
-  .hero-facts { gap: clamp(5px, 2vw, 10px); margin-top: 22px; }
+  .hero-facts { gap: clamp(8px, 4vw, 14px); margin-top: 22px; }
   .hero-fact { gap: 5px; min-width: 0; }
   .hero-fact strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hero-fact > span { width: 100%; font-size: 8px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
@@ -656,7 +656,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 }
 @media (max-width: 520px) {
   .hero-bottom { gap: 7px; }
-  .hero-facts { gap: 3px; }
+  .hero-facts { gap: 8px; }
   .hero-fact { min-width: 0; }
   .hero-fact strong { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hero-fact > span { width: 100%; font-size: 7.5px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
@@ -670,7 +670,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .download-popup-qr-frame { width: 196px; height: 196px; }
   .download-popup-qr { width: 180px; height: 180px; }
   .hero-bottom { gap: 6px; }
-  .hero-facts { gap: 2px; }
+  .hero-facts { gap: 6px; }
   .hero-fact { min-width: 0; }
   .hero-fact strong { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hero-fact > span { width: 100%; font-size: 7px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
