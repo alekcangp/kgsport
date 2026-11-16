@@ -1,3 +1,4 @@
+/* Токены палитры Okabe–Ito (--oi-*) выставляет main.ts. */
 html, body, #app { height: 100%; margin: 0; }
 html, body { background: #102536; }
 html { scroll-behavior: smooth; }
@@ -92,8 +93,8 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .map-action.is-active { border-color: var(--map-lime); background: var(--map-lime); color: var(--map-deep); }
 .map-action.is-active > .ui-icon { color: var(--map-deep); }
 .map-action.is-active:hover { border-color: #d5ff7a; background: #d5ff7a; color: var(--map-deep); }
-.geo-marker { position: relative; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; background: #2f7cf6; box-shadow: 0 0 0 3px rgba(47, 124, 246, .35), 0 2px 8px rgba(0, 0, 0, .45); }
-.geo-marker::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid rgba(47, 124, 246, .55); animation: geo-pulse 2s ease-out infinite; }
+.geo-marker { position: relative; width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; background: var(--oi-reddish-purple); box-shadow: 0 0 0 3px rgba(204, 121, 167, .35), 0 2px 8px rgba(0, 0, 0, .45); }
+.geo-marker::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px solid rgba(204, 121, 167, .55); animation: geo-pulse 2s ease-out infinite; }
 @keyframes geo-pulse { 0% { transform: scale(.6); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
 .geo-status { position: absolute; z-index: 5; left: 12px; bottom: 12px; max-width: calc(100% - 24px); margin: 0; padding: 7px 11px; border: 1px solid rgba(199, 246, 87, .35); border-radius: 999px; background: rgba(10, 23, 19, .9); color: #f3f1e8; font-size: 11px; font-weight: 700; pointer-events: none; }
 .map-orient { position: absolute; z-index: 6; top: 12px; right: 12px; display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 6px; }
@@ -541,8 +542,8 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   user-select: none;
   pointer-events: none;
 }
-.track-marker.start { background: #22c55e; }
-.track-marker.finish { background: #ef4444; }
+.track-marker.start { background: var(--oi-green); }
+.track-marker.finish { background: var(--oi-vermillion); }
 
 /* GPX download dialog — matches the map screen's paper, forest and lime palette. */
 .download-popup-overlay {

@@ -52,6 +52,22 @@ let stopGeolocation: (() => void) | null = null;
 /** Отписка от оконных слушателей жестов круиза при удалении карты. */
 let cruiseGestureController: AbortController | null = null;
 
+// Палитра Okabe–Ito: цветослепобезопасные цвета для трассы и маркеров.
+const OKABE_ITO = {
+  orange: '#E69F00',
+  skyBlue: '#56B4E9',
+  green: '#009E73',
+  yellow: '#F0E442',
+  reddishPurple: '#CC79A7',
+  vermillion: '#D55E00',
+} as const;
+
+// CSS-правила маркеров берут цвета из тех же токенов — палитра задана только здесь.
+for (const [role, value] of Object.entries(OKABE_ITO)) {
+  const token = role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  document.documentElement.style.setProperty(`--oi-${token}`, value);
+}
+
 const SLOPE_ANGLE_DEG = 3; // порог угла наклона: больше 3° — подъём/спуск, меньше — ровно
 const SAMPLE_STEP_M = 5;
 
@@ -499,14 +515,14 @@ async function drawThumbnail(t: Track) {
   const offY = (h - rangeY * scale) / 2;
   const sx = (x: number) => offX + (x - minx) * scale;
   const sy = (y: number) => h - offY - (y - miny) * scale;
-  ctx.strokeStyle = 'rgba(199, 246, 87, 0.12)';
+  ctx.strokeStyle = 'rgba(240, 228, 66, 0.12)';
   ctx.lineWidth = 10;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
   coords.forEach((c, i) => { const x = sx(c[0]), y = sy(c[1]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
   ctx.stroke();
-  ctx.strokeStyle = '#c7f657';
+  ctx.strokeStyle = OKABE_ITO.yellow;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   coords.forEach((c, i) => { const x = sx(c[0]), y = sy(c[1]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
@@ -1018,7 +1034,7 @@ async function initViewer(t: Track, requestId: number) {
       cruiseDistanceKm = profileDistanceKm;
       lastFrameTime = null;
       if (!flyMarker) {
-        flyMarker = new maplibre.Marker({ color: '#f59e0b', subpixelPositioning: true })
+        flyMarker = new maplibre.Marker({ color: OKABE_ITO.orange, subpixelPositioning: true })
           .setLngLat(coords[currentIdx] as [number, number])
           .addTo(map);
       }
@@ -1197,7 +1213,7 @@ async function initViewer(t: Track, requestId: number) {
       .setLngLat(coords[coords.length - 1] as [number, number]).addTo(map);
 
     if (!flyMarker) {
-      flyMarker = new maplibre.Marker({ color: '#f59e0b', subpixelPositioning: true })
+      flyMarker = new maplibre.Marker({ color: OKABE_ITO.orange, subpixelPositioning: true })
         .setLngLat(coords[currentIdx] as [number, number])
         .addTo(map);
     }
@@ -1282,9 +1298,9 @@ function renderTrackSlope(coords: number[][], elevations: number[], dists: numbe
   }
 
   const typeColors: Record<SlopeType, string> = {
-    ascent: '#ef4444',   // подъём — красный
-    descent: '#22c55e',  // спуск — зелёный
-    flat: '#94a3b8',     // ровный — серый
+    ascent: OKABE_ITO.vermillion, // подъём — вермильон
+    descent: OKABE_ITO.skyBlue,   // спуск — небесно-голубой
+    flat: OKABE_ITO.yellow,       // ровный — жёлтый
   };
 
   for (const [type, color] of Object.entries(typeColors)) {
@@ -1383,7 +1399,7 @@ function renderProfileBase(w: number, h: number): HTMLCanvasElement | null {
 
   // profile line (по расстоянию, как и маркер)
   if (elevations.length > 1) {
-    ctx.strokeStyle = '#c7f657';
+    ctx.strokeStyle = OKABE_ITO.yellow;
     ctx.lineWidth = 2;
     ctx.beginPath();
     elevations.forEach((y, i) => {
