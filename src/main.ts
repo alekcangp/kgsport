@@ -401,7 +401,7 @@ function renderGallery(tracks: Track[]) {
               </div>
               <div class="qr-item">
                 <canvas id="android-qr" width="144" height="144" aria-label="QR-код: APK-приложение для Android"></canvas>
-                <span class="qr-caption">Скачать APK</span>
+                <span class="qr-caption">APK-файл</span>
               </div>
             </div>
           </div>
