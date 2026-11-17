@@ -377,13 +377,15 @@ function renderGallery(tracks: Track[]) {
 
           <div class="hero-side">
             <div class="hero-art">
-              <div class="art-orbit art-orbit-one"></div>
-              <div class="art-orbit art-orbit-two"></div>
-              <div class="snowfall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
               <span class="art-label"><span class="art-label-dot"></span> ТВОЯ ЗИМНЯЯ ТОЧКА СТАРТА</span>
-              <div class="hero-logo-frame" role="img" aria-label="Крутая горка — лыжные трассы">
-                <video id="hero-logo-video" class="hero-logo-video" autoplay muted loop playsinline preload="none" poster="./og-image.png" aria-hidden="true"></video>
-                <img class="hero-logo-fallback" src="./og-image.png" alt="" aria-hidden="true">
+              <div class="hero-logo-stage">
+                <div class="art-orbit art-orbit-one"></div>
+                <div class="art-orbit art-orbit-two"></div>
+                <div class="snowfall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="hero-logo-frame" role="img" aria-label="Крутая горка — лыжные трассы">
+                  <video id="hero-logo-video" class="hero-logo-video" autoplay muted loop playsinline preload="none" poster="./og-image.png" aria-hidden="true"></video>
+                  <img class="hero-logo-fallback" src="./og-image.png" alt="" aria-hidden="true">
+                </div>
               </div>
               <span class="art-coordinate">55°21′N &nbsp; 73°13′E</span>
             </div>
