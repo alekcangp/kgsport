@@ -34,6 +34,15 @@ let profileDistanceKm = 0;
 let profileBase: HTMLCanvasElement | null = null;
 const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 let sunClockTimer: ReturnType<typeof setInterval> | null = null;
+let sunPreviewBadge: HTMLElement | null = null;
+
+// Dev-предпросмотр времени суток: ?hour=6.5 (фиксированный час) или ?cycle (полный цикл за ~24с).
+const sunPreviewParams = new URLSearchParams(window.location.search);
+const sunPreviewHourRaw = sunPreviewParams.get('hour');
+const sunPreviewHour = sunPreviewHourRaw !== null ? Number(sunPreviewHourRaw) : null;
+const sunPreviewCycle = sunPreviewParams.has('cycle');
+const sunPreviewActive = sunPreviewCycle || (sunPreviewHour !== null && Number.isFinite(sunPreviewHour));
+const sunPreviewCycleStart = Date.now();
 
 
 let isFlying = false;
@@ -172,6 +181,21 @@ function syncLogoMotion() {
 logoMotionPreference.addEventListener('change', syncLogoMotion);
 
 /**
+ * Текущий час суток (0..24). В режиме предпросмотра (?hour / ?cycle) берётся не из системных часов.
+ */
+function currentHourOfDay(): number {
+  if (sunPreviewCycle) {
+    const elapsedSec = (Date.now() - sunPreviewCycleStart) / 1000;
+    return (elapsedSec % 24);
+  }
+  if (sunPreviewActive && sunPreviewHour !== null) {
+    return ((sunPreviewHour % 24) + 24) % 24;
+  }
+  const now = new Date();
+  return now.getHours() + now.getMinutes() / 60;
+}
+
+/**
  * Плавно ведёт солнце по дуге и меняет его тон по текущему времени суток.
  * Позиция и цвет намеренно приглушены, чтобы не отвлекать от контента.
  */
@@ -180,8 +204,7 @@ function updateSunByTime() {
   const home = document.querySelector<HTMLElement>('.home-screen');
   if (!sun && !home) return;
 
-  const now = new Date();
-  const hours = now.getHours() + now.getMinutes() / 60;
+  const hours = currentHourOfDay();
 
   // Условный «день»: от рассвета ~05:30 до заката ~20:00.
   const dawn = 5.5;
@@ -218,11 +241,25 @@ function updateSunByTime() {
     home.style.setProperty('--mount-near-base', nearBase);
     home.style.setProperty('--mount-near-top', nearTop);
   }
+
+  if (sunPreviewBadge) {
+    const hh = Math.floor(hours) % 24;
+    const mm = Math.floor((hours - Math.floor(hours)) * 60);
+    sunPreviewBadge.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  }
 }
 
 function startSunClock() {
+  if (sunPreviewActive) {
+    document.documentElement.classList.add('sun-preview');
+    const badge = document.createElement('div');
+    badge.className = 'sun-preview-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(badge);
+    sunPreviewBadge = badge;
+  }
   updateSunByTime();
-  sunClockTimer ??= setInterval(updateSunByTime, 60000);
+  sunClockTimer ??= setInterval(updateSunByTime, sunPreviewCycle ? 250 : 60000);
 }
 
 let profileResizeFrame: number | null = null;
