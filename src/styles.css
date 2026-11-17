@@ -248,7 +248,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .hero-sun {
   position: absolute;
   z-index: -2;
-  left: 64%;
+  left: 38%;
   bottom: 24%;
   width: clamp(120px, 16vw, 230px);
   aspect-ratio: 1;
@@ -256,11 +256,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   background: radial-gradient(circle at 50% 50%, #fffdf3 0 16%, #ffe9a4 40%, rgba(255, 205, 120, .55) 62%, rgba(255, 196, 110, 0) 72%);
   box-shadow: 0 0 90px 45px rgba(255, 212, 130, .28);
   pointer-events: none;
-  animation: sun-rise 18s ease-in-out infinite, sun-glow 9s ease-in-out infinite;
-}
-@keyframes sun-rise {
-  0%, 100% { transform: translateY(26px); }
-  50%      { transform: translateY(-14px); }
+  animation: sun-glow 9s ease-in-out infinite;
 }
 @keyframes sun-glow {
   0%, 100% { opacity: .82; }
