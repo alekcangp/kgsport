@@ -177,7 +177,8 @@ logoMotionPreference.addEventListener('change', syncLogoMotion);
  */
 function updateSunByTime() {
   const sun = document.querySelector<HTMLElement>('.hero-sun');
-  if (!sun) return;
+  const home = document.querySelector<HTMLElement>('.home-screen');
+  if (!sun && !home) return;
 
   const now = new Date();
   const hours = now.getHours() + now.getMinutes() / 60;
@@ -190,15 +191,33 @@ function updateSunByTime() {
   const isNight = dayProgress < 0 || dayProgress > 1;
 
   const arc = Math.sin(Math.PI * fromHorizon); // 0 у горизонта, 1 в зените
-  const left = 16 + fromHorizon * 62;          // восток → запад: 16%..78%
-  const bottom = 8 + arc * 24;                  // дуга подъёма: 8%..32%
-  const opacity = isNight ? 0.04 : 0.12 + arc * 0.45; // максимум ~0.57
-  const hue = 18 + arc * 16;                    // у горизонта краснее, в зените золотистее
 
-  sun.style.setProperty('--sun-left', `${left.toFixed(2)}%`);
-  sun.style.setProperty('--sun-bottom', `${bottom.toFixed(2)}%`);
-  sun.style.setProperty('--sun-opacity', opacity.toFixed(3));
-  sun.style.setProperty('--sun-hue', `${hue.toFixed(1)}deg`);
+  if (sun) {
+    const left = 16 + fromHorizon * 62;          // восток → запад: 16%..78%
+    const bottom = 8 + arc * 24;                  // дуга подъёма: 8%..32%
+    const opacity = isNight ? 0.04 : 0.12 + arc * 0.45; // максимум ~0.57
+    const hue = 18 + arc * 16;                    // у горизонта краснее, в зените золотистее
+
+    sun.style.setProperty('--sun-left', `${left.toFixed(2)}%`);
+    sun.style.setProperty('--sun-bottom', `${bottom.toFixed(2)}%`);
+    sun.style.setProperty('--sun-opacity', opacity.toFixed(3));
+    sun.style.setProperty('--sun-hue', `${hue.toFixed(1)}deg`);
+  }
+
+  if (home) {
+    // Горы: у горизонта тёплый оранжевый, в зените холодный синий, ночью тёмно-синий.
+    const warmth = isNight ? 0 : 1 - arc;
+    const hue = 206 - warmth * 176;
+    const farBase = `hsl(${hue.toFixed(1)} 30% ${(isNight ? 12 : 16 + arc * 6).toFixed(1)}%)`;
+    const nearBase = `hsl(${hue.toFixed(1)} 34% ${(isNight ? 9 : 11 + arc * 5).toFixed(1)}%)`;
+    const farTop = `hsl(${hue.toFixed(1)} 45% 70% / ${isNight ? 0.28 : 0.55})`;
+    const nearTop = `hsl(${hue.toFixed(1)} 42% 84% / ${isNight ? 0.35 : 0.72})`;
+
+    home.style.setProperty('--mount-far-base', farBase);
+    home.style.setProperty('--mount-far-top', farTop);
+    home.style.setProperty('--mount-near-base', nearBase);
+    home.style.setProperty('--mount-near-top', nearTop);
+  }
 }
 
 function startSunClock() {

@@ -239,10 +239,15 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   font-family: 'Arial Narrow', 'Segoe UI', sans-serif;
 }
 .landing-page [hidden] { display: none !important; }
-.home-screen { position: relative; isolation: isolate; display: flex; min-height: 100dvh; flex-direction: column; background: radial-gradient(ellipse at 78% 34%, rgba(75, 132, 175, .25), transparent 42%), linear-gradient(180deg, #102536 0%, #152e42 52%, #1b3548 100%); }
+/* Цвета гор тоже зависят от времени суток */
+@property --mount-far-base { syntax: '<color>'; inherits: true; initial-value: #263f53; }
+@property --mount-far-top { syntax: '<color>'; inherits: true; initial-value: rgba(172, 207, 226, .72); }
+@property --mount-near-base { syntax: '<color>'; inherits: true; initial-value: #142b3d; }
+@property --mount-near-top { syntax: '<color>'; inherits: true; initial-value: rgba(218, 235, 245, .8); }
+.home-screen { position: relative; isolation: isolate; display: flex; min-height: 100dvh; flex-direction: column; background: radial-gradient(ellipse at 78% 34%, rgba(75, 132, 175, .25), transparent 42%), linear-gradient(180deg, #102536 0%, #152e42 52%, #1b3548 100%); transition: --mount-far-base 60s linear, --mount-far-top 60s linear, --mount-near-base 60s linear, --mount-near-top 60s linear; }
 .home-screen::before, .home-screen::after { position: absolute; right: 0; bottom: 0; left: 0; content: ''; pointer-events: none; }
-.home-screen::before { z-index: -1; height: 45%; background: linear-gradient(180deg, rgba(172, 207, 226, .72) 0 2%, #263f53 2.5% 100%); clip-path: polygon(0 63%, 10% 35%, 16% 49%, 28% 8%, 41% 59%, 52% 22%, 65% 61%, 77% 18%, 91% 55%, 100% 35%, 100% 100%, 0 100%); opacity: .64; }
-.home-screen::after { z-index: -1; height: 31%; background: linear-gradient(180deg, rgba(218, 235, 245, .8) 0 2%, #142b3d 2.5% 100%); clip-path: polygon(0 55%, 13% 28%, 24% 53%, 37% 10%, 50% 57%, 64% 22%, 79% 62%, 91% 25%, 100% 48%, 100% 100%, 0 100%); opacity: .88; }
+.home-screen::before { z-index: -1; height: 45%; background: linear-gradient(180deg, var(--mount-far-top) 0 2%, var(--mount-far-base) 2.5% 100%); clip-path: polygon(0 63%, 10% 35%, 16% 49%, 28% 8%, 41% 59%, 52% 22%, 65% 61%, 77% 18%, 91% 55%, 100% 35%, 100% 100%, 0 100%); opacity: .64; }
+.home-screen::after { z-index: -1; height: 31%; background: linear-gradient(180deg, var(--mount-near-top) 0 2%, var(--mount-near-base) 2.5% 100%); clip-path: polygon(0 55%, 13% 28%, 24% 53%, 37% 10%, 50% 57%, 64% 22%, 79% 62%, 91% 25%, 100% 48%, 100% 100%, 0 100%); opacity: .88; }
 
 /* Восходящее солнце за горами — положение и тон зависят от времени суток */
 @property --sun-left { syntax: '<percentage>'; inherits: false; initial-value: 38%; }
@@ -589,6 +594,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .snowfall i:nth-child(even) { top: 68%; }
   .geo-marker::after { animation: none; opacity: .5; }
   .home-screen::before, .home-screen::after { animation: none; }
+  .home-screen { transition: none; }
   .hero-sun { animation: none; transition: none; }
   .routes-screen::before, .routes-screen::after { animation: none; }
 }
