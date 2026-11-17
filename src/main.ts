@@ -33,6 +33,7 @@ let homeVideo: HTMLVideoElement | null = null;
 let profileDistanceKm = 0;
 let profileBase: HTMLCanvasElement | null = null;
 const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+let sunClockTimer: ReturnType<typeof setInterval> | null = null;
 
 
 let isFlying = false;
@@ -169,6 +170,41 @@ function syncLogoMotion() {
 }
 
 logoMotionPreference.addEventListener('change', syncLogoMotion);
+
+/**
+ * Плавно ведёт солнце по дуге и меняет его тон по текущему времени суток.
+ * Позиция и цвет намеренно приглушены, чтобы не отвлекать от контента.
+ */
+function updateSunByTime() {
+  const sun = document.querySelector<HTMLElement>('.hero-sun');
+  if (!sun) return;
+
+  const now = new Date();
+  const hours = now.getHours() + now.getMinutes() / 60;
+
+  // Условный «день»: от рассвета ~05:30 до заката ~20:00.
+  const dawn = 5.5;
+  const dusk = 20;
+  const dayProgress = (hours - dawn) / (dusk - dawn);
+  const fromHorizon = Math.min(1, Math.max(0, dayProgress));
+  const isNight = dayProgress < 0 || dayProgress > 1;
+
+  const arc = Math.sin(Math.PI * fromHorizon); // 0 у горизонта, 1 в зените
+  const left = 16 + fromHorizon * 62;          // восток → запад: 16%..78%
+  const bottom = 8 + arc * 24;                  // дуга подъёма: 8%..32%
+  const opacity = isNight ? 0.04 : 0.12 + arc * 0.45; // максимум ~0.57
+  const hue = 18 + arc * 16;                    // у горизонта краснее, в зените золотистее
+
+  sun.style.setProperty('--sun-left', `${left.toFixed(2)}%`);
+  sun.style.setProperty('--sun-bottom', `${bottom.toFixed(2)}%`);
+  sun.style.setProperty('--sun-opacity', opacity.toFixed(3));
+  sun.style.setProperty('--sun-hue', `${hue.toFixed(1)}deg`);
+}
+
+function startSunClock() {
+  updateSunByTime();
+  sunClockTimer ??= setInterval(updateSunByTime, 60000);
+}
 
 let profileResizeFrame: number | null = null;
 window.addEventListener('resize', () => {
@@ -1630,6 +1666,7 @@ async function init() {
   try {
     const tracks = await loadTracks();
     renderGallery(tracks);
+    startSunClock();
     showScreen('home');
     scheduleTileWarmup(tracks);
   } catch (error) {

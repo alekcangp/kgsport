@@ -244,23 +244,29 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .home-screen::before { z-index: -1; height: 45%; background: linear-gradient(180deg, rgba(172, 207, 226, .72) 0 2%, #263f53 2.5% 100%); clip-path: polygon(0 63%, 10% 35%, 16% 49%, 28% 8%, 41% 59%, 52% 22%, 65% 61%, 77% 18%, 91% 55%, 100% 35%, 100% 100%, 0 100%); opacity: .64; }
 .home-screen::after { z-index: -1; height: 31%; background: linear-gradient(180deg, rgba(218, 235, 245, .8) 0 2%, #142b3d 2.5% 100%); clip-path: polygon(0 55%, 13% 28%, 24% 53%, 37% 10%, 50% 57%, 64% 22%, 79% 62%, 91% 25%, 100% 48%, 100% 100%, 0 100%); opacity: .88; }
 
-/* Восходящее солнце за горами */
+/* Восходящее солнце за горами — положение и тон зависят от времени суток */
+@property --sun-left { syntax: '<percentage>'; inherits: false; initial-value: 38%; }
+@property --sun-bottom { syntax: '<percentage>'; inherits: false; initial-value: 15%; }
+@property --sun-opacity { syntax: '<number>'; inherits: false; initial-value: .55; }
+@property --sun-hue { syntax: '<angle>'; inherits: false; initial-value: 30deg; }
 .hero-sun {
   position: absolute;
   z-index: -2;
-  left: 38%;
-  bottom: 15%;
+  left: var(--sun-left, 38%);
+  bottom: var(--sun-bottom, 15%);
   width: clamp(80px, 11vw, 160px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, #ffcf8a 0 14%, #ff9f45 38%, rgba(255, 140, 60, .5) 60%, rgba(255, 130, 55, 0) 72%);
-  box-shadow: 0 0 60px 26px rgba(255, 150, 70, .2);
+  opacity: var(--sun-opacity, .55);
+  background: radial-gradient(circle at 50% 50%, hsl(var(--sun-hue, 30deg) 92% 78%) 0 14%, hsl(var(--sun-hue, 30deg) 88% 60%) 38%, hsl(var(--sun-hue, 30deg) 82% 52% / .5) 60%, hsl(var(--sun-hue, 30deg) 82% 52% / 0) 72%);
+  box-shadow: 0 0 60px 26px hsl(var(--sun-hue, 30deg) 86% 55% / .2);
   pointer-events: none;
+  transition: --sun-left 60s linear, --sun-bottom 60s linear, --sun-opacity 60s linear, --sun-hue 60s linear;
   animation: sun-glow 9s ease-in-out infinite;
 }
 @keyframes sun-glow {
-  0%, 100% { opacity: .55; }
-  50%      { opacity: .8; }
+  0%, 100% { filter: brightness(.94); }
+  50%      { filter: brightness(1.1); }
 }
 
 
@@ -583,7 +589,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .snowfall i:nth-child(even) { top: 68%; }
   .geo-marker::after { animation: none; opacity: .5; }
   .home-screen::before, .home-screen::after { animation: none; }
-  .hero-sun { animation: none; opacity: .7; }
+  .hero-sun { animation: none; transition: none; }
   .routes-screen::before, .routes-screen::after { animation: none; }
 }
 
