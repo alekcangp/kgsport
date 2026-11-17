@@ -278,8 +278,18 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .sun-preview .hero-sun { transition-duration: .6s; }
 .sun-preview .home-screen { transition-duration: .6s; }
 .sun-cycle .hero-sun, .sun-cycle .home-screen { transition: none; }
-/* Часы в шапке — электронный циферблат по центру */
-.header-clock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #c7f657; font-family: 'Courier New', ui-monospace, 'Segoe UI Mono', monospace; font-size: 21px; font-weight: 700; letter-spacing: .16em; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(199, 246, 87, .5), 0 0 22px rgba(199, 246, 87, .22); }
+/* Семисегментный (электронный) шрифт DSEG7 Classic, лицензия OFL — см. src/fonts/DSEG-LICENSE.txt */
+@font-face {
+  font-family: 'DSEG7 Classic';
+  src: url('./fonts/DSEG7Classic-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* Часы в шапке — электронный циферблат по центру (тусклое «88:88» под ярким временем) */
+.header-clock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-family: 'DSEG7 Classic', ui-monospace, monospace; font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.header-clock-ghost { position: absolute; left: 0; top: 0; color: rgba(199, 246, 87, .14); }
+.header-clock-time { position: relative; color: #c7f657; text-shadow: 0 0 9px rgba(199, 246, 87, .55), 0 0 20px rgba(199, 246, 87, .25); }
 
 
 
@@ -551,7 +561,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   html { scroll-padding-top: env(safe-area-inset-top, 20px); }
   .site-header { height: 60px; flex-basis: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .header-kicker { gap: 7px; font-size: 8px; letter-spacing: .1em; }
-  .header-clock { font-size: 17px; letter-spacing: .1em; }
+  .header-clock { font-size: 17px; letter-spacing: .02em; }
   .header-link { gap: 6px; font-size: 8px; letter-spacing: .06em; }
   .home-screen { box-sizing: border-box; min-height: 100dvh; min-height: 100svh; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .home-screen > .hero-section { min-height: 0; flex: 1; }

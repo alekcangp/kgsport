@@ -257,7 +257,7 @@ function updateSunByTime() {
     home.style.setProperty('--mount-near-top', nearTop);
   }
 
-  const clock = document.querySelector<HTMLElement>('.header-clock');
+  const clock = document.querySelector<HTMLElement>('.header-clock-time');
   if (clock) {
     const hh = Math.floor(hours) % 24;
     const mm = Math.floor((hours - Math.floor(hours)) * 60);
@@ -507,7 +507,7 @@ function renderGallery(tracks: Track[]) {
           <div class="hero-sun" aria-hidden="true"></div>
           <header class="site-header">
             <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span></span>
-            <span class="header-clock" aria-hidden="true" hidden>--:--</span>
+            <span class="header-clock" aria-hidden="true" hidden><span class="header-clock-ghost">88:88</span><span class="header-clock-time">--:--</span></span>
             <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
           </header>
         <div class="hero-section" aria-labelledby="hero-title">

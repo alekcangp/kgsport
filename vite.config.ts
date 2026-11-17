@@ -51,7 +51,7 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,svg,png,json,kml,gpx,mjs,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,json,kml,gpx,mjs,webmanifest}'],
         globIgnores: ['icons/**', 'manifest.webmanifest', 'assets/maplibre-gl-*.js'],
         runtimeCaching: [
           {
