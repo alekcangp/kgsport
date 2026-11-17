@@ -249,18 +249,18 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   position: absolute;
   z-index: -2;
   left: 38%;
-  bottom: 24%;
+  bottom: 15%;
   width: clamp(120px, 16vw, 230px);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, #fffdf3 0 16%, #ffe9a4 40%, rgba(255, 205, 120, .55) 62%, rgba(255, 196, 110, 0) 72%);
-  box-shadow: 0 0 90px 45px rgba(255, 212, 130, .28);
+  background: radial-gradient(circle at 50% 50%, #ffcf8a 0 14%, #ff9f45 38%, rgba(255, 140, 60, .5) 60%, rgba(255, 130, 55, 0) 72%);
+  box-shadow: 0 0 80px 36px rgba(255, 150, 70, .2);
   pointer-events: none;
   animation: sun-glow 9s ease-in-out infinite;
 }
 @keyframes sun-glow {
-  0%, 100% { opacity: .82; }
-  50%      { opacity: 1; }
+  0%, 100% { opacity: .55; }
+  50%      { opacity: .8; }
 }
 
 
@@ -583,7 +583,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .snowfall i:nth-child(even) { top: 68%; }
   .geo-marker::after { animation: none; opacity: .5; }
   .home-screen::before, .home-screen::after { animation: none; }
-  .hero-sun { animation: none; opacity: .9; }
+  .hero-sun { animation: none; opacity: .7; }
   .routes-screen::before, .routes-screen::after { animation: none; }
 }
 
