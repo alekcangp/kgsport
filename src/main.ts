@@ -270,7 +270,8 @@ function ensureSunBadge() {
   const badge = document.createElement('div');
   badge.className = 'sun-preview-badge';
   badge.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(badge);
+  // Внутри главного экрана — чтобы часы скрывались вместе с ним на странице маршрутов.
+  (document.querySelector('.home-screen') ?? document.body).appendChild(badge);
   sunPreviewBadge = badge;
 }
 
