@@ -102,6 +102,10 @@ const UI_ICONS = {
   tiltUp: '<path d="M4 20h16"/><path d="M12 17V6"/><path d="m8 10 4-4 4 4"/>',
   tiltDown: '<path d="M4 4h16"/><path d="M12 7v11"/><path d="m8 14 4 4 4-4"/>',
   compass: '<circle cx="12" cy="12" r="9"/><path d="m15.4 8.6-2.3 5.8-5.1 1 2.3-5.8z" fill="currentColor" stroke="none"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41"/>',
+  sprout: '<path d="M12 21v-8"/><path d="M12 13c-3.3 0-6-2.7-6-6 3.3 0 6 2.7 6 6z"/><path d="M12 13c3.3 0 6-2.7 6-6-3.3 0-6 2.7-6 6z"/>',
+  leaf: '<path d="M5 19c0-8.3 5.7-14 14-14 0 8.3-5.7 14-14 14z"/><path d="M5 19c3.3-4.7 7.3-8 11-9"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h4v-9M15 12v9h4a1 1 0 0 0 1-1v-8M12 8v13"/><path d="M12 8C12 5.5 10.5 4 9 4a2 2 0 0 0 0 4M12 8c0-2.5 1.5-4 3-4a2 2 0 0 1 0 4"/>',
 } as const;
 
 function uiIcon(name: keyof typeof UI_ICONS): string {
@@ -213,6 +217,29 @@ function currentHourOfDay(): number {
 }
 
 /**
+ * Сезон по текущему месяцу (зима: дек–фев, весна: мар–май, лето: июн–авг, осень: сен–ноя).
+ * С 1 по 7 января показываем новогоднее поздравление.
+ */
+function currentSeason(now = new Date()): { label: string; icon: keyof typeof UI_ICONS } {
+  const month = now.getMonth(); // 0 — январь
+  const day = now.getDate();
+  if (month === 0 && day <= 7) return { label: 'С НОВЫМ ГОДОМ', icon: 'gift' };
+  if (month === 11 || month <= 1) return { label: 'ЗИМНИЙ СЕЗОН', icon: 'snowflake' };
+  if (month <= 4) return { label: 'ВЕСЕННИЙ СЕЗОН', icon: 'sprout' };
+  if (month <= 7) return { label: 'ЛЕТНИЙ СЕЗОН', icon: 'sun' };
+  return { label: 'ОСЕННИЙ СЕЗОН', icon: 'leaf' };
+}
+
+/** Обновляет иконку и подпись сезона в шапке по текущей дате. */
+function updateSeason() {
+  const season = currentSeason();
+  const icon = document.querySelector<HTMLElement>('.season-icon');
+  const label = document.querySelector<HTMLElement>('.season-label');
+  if (icon) icon.innerHTML = uiIcon(season.icon);
+  if (label) label.textContent = season.label;
+}
+
+/**
  * Плавно ведёт солнце по дуге и меняет его тон по текущему времени суток.
  * Позиция и цвет намеренно приглушены, чтобы не отвлекать от контента.
  */
@@ -265,6 +292,8 @@ function updateSunByTime() {
     const mm = Math.floor((hours - Math.floor(hours)) * 60);
     clock.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   }
+
+  updateSeason();
 }
 
 /** Показывает часы в шапке. */
@@ -547,7 +576,7 @@ function renderGallery(tracks: Track[]) {
           <header class="site-header">
             <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span><span class="header-temp" hidden></span></span>
             <span class="header-clock" aria-hidden="true" hidden><span class="header-clock-ghost">88:88</span><span class="header-clock-time">--:--</span></span>
-            <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
+            <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> <span class="season-label">ЗИМНИЙ СЕЗОН</span></span>
           </header>
         <div class="hero-section" aria-labelledby="hero-title">
           <div class="hero-copy">
@@ -662,6 +691,7 @@ function renderGallery(tracks: Track[]) {
   // актуальное положение/цвет солнца и гор, показываем часы и последнюю температуру.
   if (sunPreviewActive || sunBadgePersist) showSunClock();
   updateSunByTime();
+  updateSeason();
   showTemperature(lastTemperature);
 }
 
