@@ -44,6 +44,11 @@ const sunPreviewCycle = sunPreviewParams.has('cycle');
 const sunPreviewActive = sunPreviewCycle || (sunPreviewHour !== null && Number.isFinite(sunPreviewHour));
 const sunPreviewCycleStart = Date.now();
 
+// Ручной полный цикл по клику на логотипе.
+let manualCycleStart: number | null = null;
+let sunCycleFrame: number | null = null;
+const SUN_CYCLE_DURATION_MS = 14000;
+
 
 let isFlying = false;
 const CRUISE_SPEED_KMH = 160;
@@ -184,6 +189,10 @@ logoMotionPreference.addEventListener('change', syncLogoMotion);
  * Текущий час суток (0..24). В режиме предпросмотра (?hour / ?cycle) берётся не из системных часов.
  */
 function currentHourOfDay(): number {
+  if (manualCycleStart !== null) {
+    const progress = (Date.now() - manualCycleStart) / SUN_CYCLE_DURATION_MS;
+    return (progress * 24) % 24;
+  }
   if (sunPreviewCycle) {
     const elapsedSec = (Date.now() - sunPreviewCycleStart) / 1000;
     return (elapsedSec % 24);
@@ -249,14 +258,47 @@ function updateSunByTime() {
   }
 }
 
+function ensureSunBadge() {
+  if (sunPreviewBadge) return;
+  const badge = document.createElement('div');
+  badge.className = 'sun-preview-badge';
+  badge.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(badge);
+  sunPreviewBadge = badge;
+}
+
+function removeSunBadge() {
+  if (sunPreviewActive) return;
+  sunPreviewBadge?.remove();
+  sunPreviewBadge = null;
+}
+
+/** Запускает полный суточный цикл (0→24 за ~14с) и затем возвращает реальное время. */
+function runSunCycle() {
+  if (sunCycleFrame !== null) cancelAnimationFrame(sunCycleFrame);
+  manualCycleStart = Date.now();
+  document.documentElement.classList.add('sun-cycle');
+  ensureSunBadge();
+
+  const step = () => {
+    updateSunByTime();
+    if (manualCycleStart !== null && Date.now() - manualCycleStart < SUN_CYCLE_DURATION_MS) {
+      sunCycleFrame = requestAnimationFrame(step);
+      return;
+    }
+    sunCycleFrame = null;
+    manualCycleStart = null;
+    document.documentElement.classList.remove('sun-cycle');
+    removeSunBadge();
+    updateSunByTime();
+  };
+  step();
+}
+
 function startSunClock() {
   if (sunPreviewActive) {
     document.documentElement.classList.add('sun-preview');
-    const badge = document.createElement('div');
-    badge.className = 'sun-preview-badge';
-    badge.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(badge);
-    sunPreviewBadge = badge;
+    ensureSunBadge();
   }
   updateSunByTime();
   sunClockTimer ??= setInterval(updateSunByTime, sunPreviewCycle ? 250 : 60000);
@@ -527,6 +569,9 @@ function renderGallery(tracks: Track[]) {
 
   document.getElementById('show-routes')!.addEventListener('click', () => showScreen('routes'));
   document.getElementById('show-home')!.addEventListener('click', () => showScreen('home'));
+
+  // Клик по логотипу запускает полный суточный цикл солнца и гор.
+  document.querySelector<HTMLElement>('.hero-logo-frame')?.addEventListener('click', runSunCycle);
 
   homeVideo = document.getElementById('hero-logo-video') as HTMLVideoElement | null;
 

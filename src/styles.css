@@ -277,6 +277,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 /* Dev-предпросмотр времени суток: ?hour=<0..24> (фикс) или ?cycle (цикл за ~24с) */
 .sun-preview .hero-sun { transition-duration: .6s; }
 .sun-preview .home-screen { transition-duration: .6s; }
+.sun-cycle .hero-sun, .sun-cycle .home-screen { transition: none; }
 .sun-preview-badge { position: fixed; right: 12px; bottom: 12px; z-index: 9999; padding: 6px 11px; border-radius: 999px; background: rgba(10, 23, 19, .82); color: #c7f657; font: 800 12px/1 'Arial Narrow', 'Segoe UI', sans-serif; letter-spacing: .1em; pointer-events: none; }
 
 
@@ -443,7 +444,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .art-orbit { position: absolute; z-index: -1; left: 50%; top: 50%; border: 1px solid rgba(205, 232, 246, .15); border-radius: 50%; transform: translate(-50%, -50%) rotate(var(--orbit-start, 47deg)); }
 .art-orbit-one   { width: 112%; height: 52%; --orbit-start: 47deg;  animation: orbit-spin        60s linear infinite; }
 .art-orbit-two   { width: 102%; height: 44%; --orbit-start: 140deg; animation: orbit-spin-reverse 80s linear infinite; }
-.hero-logo-frame { position: relative; z-index: 1; display: block; width: 100%; max-width: 100%; margin: 0; aspect-ratio: 1; overflow: hidden; border: 2px solid rgba(243, 241, 232, .96); border-radius: 50%; background: #152e42; box-shadow: 0 0 0 5px rgba(243, 248, 250, .92), 0 22px 58px rgba(0, 0, 0, .42); }
+.hero-logo-frame { position: relative; z-index: 1; display: block; width: 100%; max-width: 100%; margin: 0; aspect-ratio: 1; overflow: hidden; border: 2px solid rgba(243, 241, 232, .96); border-radius: 50%; background: #152e42; box-shadow: 0 0 0 5px rgba(243, 248, 250, .92), 0 22px 58px rgba(0, 0, 0, .42); cursor: pointer; }
 .hero-logo-video, .hero-logo-fallback { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
 .hero-logo-fallback { display: none; }
 .art-label, .art-coordinate { position: relative; z-index: 3; margin: 0; color: rgba(255, 255, 255, .63); font-size: 9px; font-weight: 800; letter-spacing: .16em; }
