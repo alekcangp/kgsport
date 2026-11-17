@@ -362,6 +362,7 @@ function renderGallery(tracks: Track[]) {
     <div class="landing-page">
       <main>
         <section id="home-screen" class="home-screen" aria-labelledby="hero-title">
+          <div class="hero-sun" aria-hidden="true"></div>
           <header class="site-header">
             <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span></span>
             <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
