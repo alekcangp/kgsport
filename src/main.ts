@@ -620,6 +620,12 @@ function renderGallery(tracks: Track[]) {
   }
   renderQr(document.getElementById('site-qr') as HTMLCanvasElement, SITE_URL);
   renderQr(document.getElementById('android-qr') as HTMLCanvasElement, ANDROID_URL);
+
+  // Экран мог быть пересоздан (например, возврат с карты трассы) — старая нода бейджа уничтожена.
+  // Восстанавливаем актуальное положение/цвет солнца и гор и, если нужно, возвращаем часы.
+  sunPreviewBadge = null;
+  if (sunPreviewActive || sunBadgePersist) ensureSunBadge();
+  updateSunByTime();
 }
 
 async function drawThumbnail(t: Track) {
