@@ -15,7 +15,20 @@ async function fetchJson(url: string): Promise<unknown> {
   }
 }
 
-/** Основной источник — Open-Meteo: бесплатный, без ключа, с поддержкой CORS. */
+/**
+ * Основной источник — met.no (Норвежский метеорологический институт).
+ * Бесплатный, без ключа, с поддержкой CORS; берём первый шаг прогноза «сейчас».
+ */
+async function fetchFromMetNo(): Promise<number | null> {
+  const params = new URLSearchParams({ lat: String(LOCATION.latitude), lon: String(LOCATION.longitude) });
+  const data = (await fetchJson(
+    `https://api.met.no/weatherapi/locationforecast/2.0/compact?${params.toString()}`,
+  )) as { properties?: { timeseries?: Array<{ data?: { instant?: { details?: { air_temperature?: unknown } } } }> } };
+  const value = data.properties?.timeseries?.[0]?.data?.instant?.details?.air_temperature;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** Резервный источник — Open-Meteo: бесплатный, без ключа, с поддержкой CORS. */
 async function fetchFromOpenMeteo(): Promise<number | null> {
   const params = new URLSearchParams({
     latitude: String(LOCATION.latitude),
@@ -31,28 +44,15 @@ async function fetchFromOpenMeteo(): Promise<number | null> {
 }
 
 /**
- * Резервный источник — met.no (Норвежский метеорологический институт).
- * Тоже без ключа и с CORS; берём первый шаг прогноза «сейчас».
- */
-async function fetchFromMetNo(): Promise<number | null> {
-  const params = new URLSearchParams({ lat: String(LOCATION.latitude), lon: String(LOCATION.longitude) });
-  const data = (await fetchJson(
-    `https://api.met.no/weatherapi/locationforecast/2.0/compact?${params.toString()}`,
-  )) as { properties?: { timeseries?: Array<{ data?: { instant?: { details?: { air_temperature?: unknown } } } }> } };
-  const value = data.properties?.timeseries?.[0]?.data?.instant?.details?.air_temperature;
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-/**
  * Текущая температура воздуха в «Крутой горке» (Омск).
- * Сначала Open-Meteo, при сбое — met.no. Возвращает температуру в °C или null.
+ * Сначала met.no, при сбое — Open-Meteo. Возвращает температуру в °C или null.
  */
 export async function fetchCurrentTemperature(): Promise<number | null> {
   try {
-    const value = await fetchFromOpenMeteo();
+    const value = await fetchFromMetNo();
     if (value !== null) return value;
   } catch {
-    // Open-Meteo недоступен — пробуем запасной источник.
+    // met.no недоступен — пробуем запасной источник.
   }
-  return fetchFromMetNo();
+  return fetchFromOpenMeteo();
 }
