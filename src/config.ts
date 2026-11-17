@@ -9,3 +9,6 @@ export const SITE_URL = 'https://alekcangp.github.io/kgsport/';
  * Сам APK лежит в public/kgsport.apk и раздаётся GitHub Pages вместе с сайтом.
  */
 export const ANDROID_URL = 'https://alekcangp.github.io/kgsport/kgsport.apk';
+
+/** Координаты «Крутой горки» (Омск) — используются для запроса текущей температуры. */
+export const LOCATION = { latitude: 55.35, longitude: 73.22 };

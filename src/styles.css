@@ -338,6 +338,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 }
 .header-kicker { display: inline-flex; align-items: center; gap: 10px; color: rgba(241, 245, 235, .78); font-size: 10px; font-weight: 900; letter-spacing: .16em; }
 .header-kicker i { color: var(--lime); font-style: normal; }
+.header-temp { color: var(--lime); font-weight: 900; letter-spacing: .06em; font-variant-numeric: tabular-nums; }
 .home-screen > .hero-section { box-sizing: border-box; flex: 1; min-height: calc(100dvh - 76px); }
 .brand { display: inline-flex; align-items: center; gap: 11px; color: white; text-decoration: none; }
 .brand-mark { width: 42px; height: 42px; overflow: hidden; border-radius: 50%; background: white; }

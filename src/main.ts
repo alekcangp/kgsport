@@ -7,6 +7,7 @@ import { lineString, nearestPointOnLine } from '@turf/turf';
 import { cumulativeDistancesKm, escapeHtml, haversineKm, isViewableTrackFile, lineCoordinates, positionAtDistance, resolveElevations, slopeAngleAtDistance, trackFileUrl, valueAtDistance } from './track-utils';
 import { IMAGERY_TILES_TEMPLATE, imageryTileUrls, TERRAIN_TILES_TEMPLATE, terrainTileUrls, warmTileCache, type NetworkInformationLike } from './tile-cache';
 import { ANDROID_URL, SITE_URL } from './config';
+import { fetchCurrentTemperature } from './weather';
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
@@ -34,6 +35,7 @@ let profileDistanceKm = 0;
 let profileBase: HTMLCanvasElement | null = null;
 const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 let sunClockTimer: ReturnType<typeof setInterval> | null = null;
+let lastTemperature: number | null = null;
 
 // Dev-предпросмотр времени суток: ?hour=6.5 (фиксированный час) или ?cycle (полный цикл за ~24с).
 const sunPreviewParams = new URLSearchParams(window.location.search);
@@ -312,6 +314,43 @@ function startSunClock() {
   sunClockTimer ??= setInterval(updateSunByTime, sunPreviewCycle ? 250 : 60000);
 }
 
+/** Форматирует температуру: «−12°». */
+function formatTemperature(value: number): string {
+  const rounded = Math.round(value);
+  return `${rounded < 0 ? '\u2212' : ''}${Math.abs(rounded)}°`;
+}
+
+/** Показывает температуру в шапке или прячет, если данных нет. */
+function showTemperature(value: number | null) {
+  const el = document.querySelector<HTMLElement>('.header-temp');
+  if (!el) return;
+  if (value === null) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.textContent = formatTemperature(value);
+  el.hidden = false;
+}
+
+/** Тянет текущую температуру. Без сети/при ошибке — не показываем (как и просили). */
+async function refreshTemperature() {
+  try {
+    const value = await fetchCurrentTemperature();
+    lastTemperature = value;
+    showTemperature(value);
+  } catch {
+    lastTemperature = null;
+    showTemperature(null);
+  }
+}
+
+function startWeatherClock() {
+  showTemperature(lastTemperature);
+  void refreshTemperature();
+  setInterval(() => { void refreshTemperature(); }, 15 * 60 * 1000);
+}
+
 let profileResizeFrame: number | null = null;
 window.addEventListener('resize', () => {
   if (profileResizeFrame !== null) return;
@@ -506,7 +545,7 @@ function renderGallery(tracks: Track[]) {
         <section id="home-screen" class="home-screen" aria-labelledby="hero-title">
           <div class="hero-sun" aria-hidden="true"></div>
           <header class="site-header">
-            <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span></span>
+            <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span><span class="header-temp" hidden></span></span>
             <span class="header-clock" aria-hidden="true" hidden><span class="header-clock-ghost">88:88</span><span class="header-clock-time">--:--</span></span>
             <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
           </header>
@@ -620,9 +659,10 @@ function renderGallery(tracks: Track[]) {
   renderQr(document.getElementById('android-qr') as HTMLCanvasElement, ANDROID_URL);
 
   // Экран мог быть пересоздан (например, возврат с карты трассы). Восстанавливаем
-  // актуальное положение/цвет солнца и гор и, если нужно, показываем часы в шапке.
+  // актуальное положение/цвет солнца и гор, показываем часы и последнюю температуру.
   if (sunPreviewActive || sunBadgePersist) showSunClock();
   updateSunByTime();
+  showTemperature(lastTemperature);
 }
 
 async function drawThumbnail(t: Track) {
@@ -1782,6 +1822,7 @@ async function init() {
     const tracks = await loadTracks();
     renderGallery(tracks);
     startSunClock();
+    startWeatherClock();
     showScreen('home');
     scheduleTileWarmup(tracks);
   } catch (error) {
