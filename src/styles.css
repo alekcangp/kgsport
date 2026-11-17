@@ -278,7 +278,8 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .sun-preview .hero-sun { transition-duration: .6s; }
 .sun-preview .home-screen { transition-duration: .6s; }
 .sun-cycle .hero-sun, .sun-cycle .home-screen { transition: none; }
-.sun-preview-badge { position: fixed; right: 16px; bottom: 16px; z-index: 9999; padding: 9px 16px; border-radius: 999px; background: rgba(10, 23, 19, .85); color: #c7f657; font: 800 16px/1 'Arial Narrow', 'Segoe UI', sans-serif; letter-spacing: .12em; pointer-events: none; }
+/* Часы в шапке — электронный циферблат по центру */
+.header-clock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #c7f657; font-family: 'Courier New', ui-monospace, 'Segoe UI Mono', monospace; font-size: 21px; font-weight: 700; letter-spacing: .16em; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(199, 246, 87, .5), 0 0 22px rgba(199, 246, 87, .22); }
 
 
 
@@ -550,6 +551,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   html { scroll-padding-top: env(safe-area-inset-top, 20px); }
   .site-header { height: 60px; flex-basis: 60px; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .header-kicker { gap: 7px; font-size: 8px; letter-spacing: .1em; }
+  .header-clock { font-size: 17px; letter-spacing: .1em; }
   .header-link { gap: 6px; font-size: 8px; letter-spacing: .06em; }
   .home-screen { box-sizing: border-box; min-height: 100dvh; min-height: 100svh; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .home-screen > .hero-section { min-height: 0; flex: 1; }

@@ -34,7 +34,6 @@ let profileDistanceKm = 0;
 let profileBase: HTMLCanvasElement | null = null;
 const logoMotionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
 let sunClockTimer: ReturnType<typeof setInterval> | null = null;
-let sunPreviewBadge: HTMLElement | null = null;
 
 // Dev-предпросмотр времени суток: ?hour=6.5 (фиксированный час) или ?cycle (полный цикл за ~24с).
 const sunPreviewParams = new URLSearchParams(window.location.search);
@@ -258,27 +257,25 @@ function updateSunByTime() {
     home.style.setProperty('--mount-near-top', nearTop);
   }
 
-  if (sunPreviewBadge) {
+  const clock = document.querySelector<HTMLElement>('.header-clock');
+  if (clock) {
     const hh = Math.floor(hours) % 24;
     const mm = Math.floor((hours - Math.floor(hours)) * 60);
-    sunPreviewBadge.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    clock.textContent = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   }
 }
 
-function ensureSunBadge() {
-  if (sunPreviewBadge) return;
-  const badge = document.createElement('div');
-  badge.className = 'sun-preview-badge';
-  badge.setAttribute('aria-hidden', 'true');
-  // Внутри главного экрана — чтобы часы скрывались вместе с ним на странице маршрутов.
-  (document.querySelector('.home-screen') ?? document.body).appendChild(badge);
-  sunPreviewBadge = badge;
+/** Показывает часы в шапке. */
+function showSunClock() {
+  const clock = document.querySelector<HTMLElement>('.header-clock');
+  if (clock) clock.hidden = false;
 }
 
-function removeSunBadge() {
+/** Прячет часы в шапке (в режиме предпросмотра всегда оставляем видимыми). */
+function hideSunClock() {
   if (sunPreviewActive) return;
-  sunPreviewBadge?.remove();
-  sunPreviewBadge = null;
+  const clock = document.querySelector<HTMLElement>('.header-clock');
+  if (clock) clock.hidden = true;
 }
 
 /** Запускает полный суточный цикл (от текущего часа и обратно) за ~14с. */
@@ -286,10 +283,10 @@ function runSunCycle() {
   if (sunCycleFrame !== null) cancelAnimationFrame(sunCycleFrame);
   manualCycleStart = Date.now();
   manualCycleStartHour = realHourOfDay();
-  // Клик переключает: после первого цикла часы остаются, после повторного — убираются.
+  // Клик переключает: после первого цикла часы остаются, после повторного — скрываются.
   sunBadgePersist = !sunBadgePersist;
   document.documentElement.classList.add('sun-cycle');
-  ensureSunBadge();
+  showSunClock();
 
   const step = () => {
     updateSunByTime();
@@ -300,7 +297,7 @@ function runSunCycle() {
     sunCycleFrame = null;
     manualCycleStart = null;
     document.documentElement.classList.remove('sun-cycle');
-    if (!sunBadgePersist) removeSunBadge();
+    if (!sunBadgePersist) hideSunClock();
     updateSunByTime();
   };
   step();
@@ -309,7 +306,7 @@ function runSunCycle() {
 function startSunClock() {
   if (sunPreviewActive) {
     document.documentElement.classList.add('sun-preview');
-    ensureSunBadge();
+    showSunClock();
   }
   updateSunByTime();
   sunClockTimer ??= setInterval(updateSunByTime, sunPreviewCycle ? 250 : 60000);
@@ -510,6 +507,7 @@ function renderGallery(tracks: Track[]) {
           <div class="hero-sun" aria-hidden="true"></div>
           <header class="site-header">
             <span class="header-kicker"><span class="status-dot"></span><span>КРУТАЯ ГОРКА <i>·</i> ОМСК</span></span>
+            <span class="header-clock" aria-hidden="true" hidden>--:--</span>
             <span class="header-link"><span class="season-icon">${uiIcon('snowflake')}</span> ЗИМНИЙ СЕЗОН</span>
           </header>
         <div class="hero-section" aria-labelledby="hero-title">
@@ -621,10 +619,9 @@ function renderGallery(tracks: Track[]) {
   renderQr(document.getElementById('site-qr') as HTMLCanvasElement, SITE_URL);
   renderQr(document.getElementById('android-qr') as HTMLCanvasElement, ANDROID_URL);
 
-  // Экран мог быть пересоздан (например, возврат с карты трассы) — старая нода бейджа уничтожена.
-  // Восстанавливаем актуальное положение/цвет солнца и гор и, если нужно, возвращаем часы.
-  sunPreviewBadge = null;
-  if (sunPreviewActive || sunBadgePersist) ensureSunBadge();
+  // Экран мог быть пересоздан (например, возврат с карты трассы). Восстанавливаем
+  // актуальное положение/цвет солнца и гор и, если нужно, показываем часы в шапке.
+  if (sunPreviewActive || sunBadgePersist) showSunClock();
   updateSunByTime();
 }
 
