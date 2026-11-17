@@ -46,6 +46,7 @@ const sunPreviewCycleStart = Date.now();
 
 // Ручной полный цикл по клику на логотипе.
 let manualCycleStart: number | null = null;
+let manualCycleStartHour = 0;
 let sunCycleFrame: number | null = null;
 const SUN_CYCLE_DURATION_MS = 14000;
 
@@ -188,10 +189,16 @@ logoMotionPreference.addEventListener('change', syncLogoMotion);
 /**
  * Текущий час суток (0..24). В режиме предпросмотра (?hour / ?cycle) берётся не из системных часов.
  */
+/** Реальный час суток по системным часам (0..24). */
+function realHourOfDay(): number {
+  const now = new Date();
+  return now.getHours() + now.getMinutes() / 60;
+}
+
 function currentHourOfDay(): number {
   if (manualCycleStart !== null) {
     const progress = (Date.now() - manualCycleStart) / SUN_CYCLE_DURATION_MS;
-    return (progress * 24) % 24;
+    return (manualCycleStartHour + progress * 24) % 24;
   }
   if (sunPreviewCycle) {
     const elapsedSec = (Date.now() - sunPreviewCycleStart) / 1000;
@@ -200,8 +207,7 @@ function currentHourOfDay(): number {
   if (sunPreviewActive && sunPreviewHour !== null) {
     return ((sunPreviewHour % 24) + 24) % 24;
   }
-  const now = new Date();
-  return now.getHours() + now.getMinutes() / 60;
+  return realHourOfDay();
 }
 
 /**
@@ -277,6 +283,7 @@ function removeSunBadge() {
 function runSunCycle() {
   if (sunCycleFrame !== null) cancelAnimationFrame(sunCycleFrame);
   manualCycleStart = Date.now();
+  manualCycleStartHour = realHourOfDay();
   document.documentElement.classList.add('sun-cycle');
   ensureSunBadge();
 
