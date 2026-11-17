@@ -248,6 +248,18 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 
 
 
+/* Легкий вертикальный паралакс фоновых форм (горы/тени) */
+@keyframes mountain-drift-up {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@keyframes mountain-drift-down {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(10px); }
+}
+.home-screen::before { animation: mountain-drift-up 14s ease-in-out infinite; }
+.home-screen::after  { animation: mountain-drift-down 18s ease-in-out infinite reverse; }
+
 /* Ветер для снега — лёгкий боковой сдвиг */
 @keyframes wind-sway {
   0%, 100% { transform: translateX(0); }
@@ -539,6 +551,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
   .snowfall i { top: 24%; animation: none; opacity: .38; }
   .snowfall i:nth-child(even) { top: 68%; }
   .geo-marker::after { animation: none; opacity: .5; }
+  .home-screen::before, .home-screen::after { animation: none; }
 }
 
 /* Метки старта и финиша на карте */
