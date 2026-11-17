@@ -48,6 +48,7 @@ const sunPreviewCycleStart = Date.now();
 let manualCycleStart: number | null = null;
 let manualCycleStartHour = 0;
 let sunCycleFrame: number | null = null;
+let sunBadgePersist = false;
 const SUN_CYCLE_DURATION_MS = 14000;
 
 
@@ -279,11 +280,13 @@ function removeSunBadge() {
   sunPreviewBadge = null;
 }
 
-/** Запускает полный суточный цикл (0→24 за ~14с) и затем возвращает реальное время. */
+/** Запускает полный суточный цикл (от текущего часа и обратно) за ~14с. */
 function runSunCycle() {
   if (sunCycleFrame !== null) cancelAnimationFrame(sunCycleFrame);
   manualCycleStart = Date.now();
   manualCycleStartHour = realHourOfDay();
+  // Клик переключает: после первого цикла часы остаются, после повторного — убираются.
+  sunBadgePersist = !sunBadgePersist;
   document.documentElement.classList.add('sun-cycle');
   ensureSunBadge();
 
@@ -296,7 +299,7 @@ function runSunCycle() {
     sunCycleFrame = null;
     manualCycleStart = null;
     document.documentElement.classList.remove('sun-cycle');
-    removeSunBadge();
+    if (!sunBadgePersist) removeSunBadge();
     updateSunByTime();
   };
   step();

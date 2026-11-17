@@ -278,7 +278,7 @@ body.map-open { position: fixed; inset: 0; overflow: hidden; overscroll-behavior
 .sun-preview .hero-sun { transition-duration: .6s; }
 .sun-preview .home-screen { transition-duration: .6s; }
 .sun-cycle .hero-sun, .sun-cycle .home-screen { transition: none; }
-.sun-preview-badge { position: fixed; right: 12px; bottom: 12px; z-index: 9999; padding: 6px 11px; border-radius: 999px; background: rgba(10, 23, 19, .82); color: #c7f657; font: 800 12px/1 'Arial Narrow', 'Segoe UI', sans-serif; letter-spacing: .1em; pointer-events: none; }
+.sun-preview-badge { position: fixed; right: 16px; bottom: 16px; z-index: 9999; padding: 9px 16px; border-radius: 999px; background: rgba(10, 23, 19, .85); color: #c7f657; font: 800 16px/1 'Arial Narrow', 'Segoe UI', sans-serif; letter-spacing: .12em; pointer-events: none; }
 
 
 
